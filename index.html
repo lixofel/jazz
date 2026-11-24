@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Jazz Voicing Studio</title>
+  <title>Jazz Voicing Studio v6</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0f172a" />
   <script src="https://cloudflare.com"></script>
@@ -34,7 +34,7 @@
     #keyboard-pane { background: #090d16; border-top: 2px solid #334155; display: flex; flex-direction: column; justify-content: space-between; padding: 8px; flex: 0 0 auto; }
     .kb-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
     .piano { position: relative; display: flex; height: 145px; width: 100%; overflow-x: auto; user-select: none; background: #0f172a; }
-    .white-key { flex: 1; min-width: 36px; height: 140px; background: #f8fafc; border: 1px solid #64748b; border-radius: 0 0 5px 5px; position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; color: #0f172a; font-size: 10px; font-weight: bold; }
+    .white-key { flex: 1; min-width: 38px; height: 140px; background: #f8fafc; border: 1px solid #64748b; border-radius: 0 0 5px 5px; position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; color: #0f172a; font-size: 10px; font-weight: bold; }
     .black-key { width: 24px; height: 85px; background: #0f172a; border: 1px solid #475569; border-radius: 0 0 4px 4px; margin-left: -12px; margin-right: -12px; z-index: 2; }
     .key.active { background: #f59e0b !important; color: #000000 !important; }
   </style>
@@ -91,7 +91,7 @@
 
     <div id="keyboard-pane" class="pane">
       <div class="kb-toolbar">
-        <span id="active-notes-display">Tap keys to build a voicing or select a cell</span>
+        <span id="active-notes-display">v6 Ready - Tap keys or select a cell</span>
         <button onclick="clearActiveKeys()">Clear Keys</button>
       </div>
       <div id="piano" class="piano"></div>
@@ -99,6 +99,10 @@
   </main>
 
   <script>
+    window.onerror = function(msg, url, line) {
+      document.getElementById("active-notes-display").textContent = "Error: " + msg + " (line " + line + ")";
+    };
+
     var synth = null;
     var noteNames = "C,C#,D,D#,E,F,F#,G,G#,A,A#,B".split(",");
 
@@ -161,7 +165,7 @@
     var playInterval = null;
 
     function midiToName(midi) {
-      return noteNames[midi % 12] + (Math.floor(midi / 12) - 1);
+      return noteNames.slice(midi % 12, (midi % 12) + 1).pop() + (Math.floor(midi / 12) - 1);
     }
 
     function renderSpreadsheet() {
@@ -177,41 +181,9 @@
         div.onclick = function() { selectCell(index); };
 
         if (cell) {
-          var noteLabels = cell.midi.map(function(m) { return noteNames[m % 12]; }).join("-");
+          var noteLabels = cell.midi.map(function(m) { return noteNames.slice(m % 12, (m % 12) + 1).pop(); }).join("-");
           div.innerHTML = "<div class='cell-chord'>" + cell.label + "</div><div class='cell-notes'>" + noteLabels + "</div>";
         } else {
-          div.innerHTML = "<div class='cell-notes'>Beat " + ((index % cols) + 1) + "</div>";
-        }
-        container.appendChild(div);
-      });
-    }
-
-    function selectCell(idx) {
-      selectedCellIndex = idx;
-playInterval = setInterval(tick, 900);
-}
-function runPrompt() {
-var raw = document.getElementById("prompt-input").value.trim();
-if (!raw) return;
-if (raw.indexOf("3/4") !== -1) document.getElementById("time-sig").value = "3";
-else if (raw.indexOf("6/8") !== -1) document.getElementById("time-sig").value = "6";
-else if (raw.indexOf("4/4") !== -1) document.getElementById("time-sig").value = "4";
-var cols = parseInt(document.getElementById("time-sig").value) || 4;
-var cleaned = raw.replace("3/4", "").replace("4/4", "").replace("6/8", "");
-var rawParts = cleaned.split("|");
-var tokens = [];
-rawParts.forEach(function(part) {
-var t = part.trim();
-if (t) tokens.push(t);
-});
-if (tokens.length === 0) return;
-var totalCells = Math.max(tokens.length, cols * 2);
-gridCells = [];
-for (var j = 0; j < totalCells; j++) gridCells.push(null);
-var flatMap = { "Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#" };
-tokens.forEach(function(token, idx) {
-var firstChar = token.charAt(0).toUpperCase();
-if ("ABCDEFG".indexOf(firstChar) === -1) return;
 var secondChar = token.charAt(1);
 var rootStr = firstChar;
 var qualPart = token.substring(1);
