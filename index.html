@@ -1,3 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Jazz Voicing Studio</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0f172a" />
+  <script src="https://cloudflare.com"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+    header { background: #1e293b; padding: 8px 12px; border-bottom: 1px solid #334155; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+    .btn-group { display: flex; gap: 4px; background: #0f172a; padding: 3px; border-radius: 8px; }
+    button, select, input { background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+    button { cursor: pointer; font-weight: 600; }
+    button.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
+    button.play-btn { background: #10b981; color: #0f172a; border: none; }
+    .prompt-bar { display: flex; gap: 6px; padding: 8px 12px; background: #162032; border-bottom: 1px solid #334155; }
+    .prompt-bar input { flex: 1; background: #0f172a; }
+    main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .pane { flex: 1; overflow-y: auto; padding: 10px; }
+    .hidden { display: none !important; }
+    .grid-controls { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+    .spreadsheet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; min-height: 120px; }
+    .cell { background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 10px 6px; text-align: center; min-height: 56px; display: flex; flex-direction: column; justify-content: center; cursor: pointer; }
+    .cell.selected { border: 2px solid #38bdf8; background: #1e3a5f; }
+    .cell.playing { border: 2px solid #10b981; background: #064e3b; }
+    .cell-chord { font-weight: 700; font-size: 13px; color: #38bdf8; }
+    .cell-notes { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+    .library-bar { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .voicing-chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; min-height: 44px; }
+    .chip { background: #273549; border: 1px solid #38bdf8; color: #f8fafc; padding: 6px 12px; border-radius: 16px; white-space: nowrap; font-size: 12px; cursor: pointer; }
+    #keyboard-pane { background: #090d16; border-top: 2px solid #334155; display: flex; flex-direction: column; justify-content: space-between; padding: 8px; flex: 0 0 auto; }
+    .kb-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
+    .piano { position: relative; display: flex; height: 145px; width: 100%; overflow-x: auto; user-select: none; background: #0f172a; }
+    .white-key { flex: 1; min-width: 36px; height: 140px; background: #f8fafc; border: 1px solid #64748b; border-radius: 0 0 5px 5px; position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; color: #0f172a; font-size: 10px; font-weight: bold; }
+    .black-key { width: 24px; height: 85px; background: #0f172a; border: 1px solid #475569; border-radius: 0 0 4px 4px; margin-left: -12px; margin-right: -12px; z-index: 2; }
+    .key.active { background: #f59e0b !important; color: #000000 !important; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="btn-group">
+      <button id="view-split" class="active" onclick="setView('split')">Split</button>
+      <button id="view-sheet" onclick="setView('sheet')">Sheet</button>
+      <button id="view-keys" onclick="setView('keys')">Keys</button>
+    </div>
+    <select id="tone-select" onchange="changeTone(this.value)">
+      <option value="rhodes">Electric Piano (Rhodes)</option>
+      <option value="grand">Warm Grand</option>
+      <option value="pad">Neo-Soul Pad</option>
+      <option value="organ">Jazz Organ</option>
+    </select>
+    <button class="play-btn" id="play-btn" onclick="togglePlay()">▶ Play</button>
+  </header>
+
+  <div class="prompt-bar">
+    <input type="text" id="prompt-input" placeholder="Prompt: e.g. 4/4 | Dm9 | G13 | Cmaj9 | A7alt" />
+    <button onclick="runPrompt()">Generate</button>
+  </div>
+
+  <main>
+    <div id="sheet-pane" class="pane">
+      <div class="grid-controls">
+        <label>Key:</label>
+        <select id="root-key">
+          <option value="0">C</option><option value="1">C# / Db</option><option value="2">D</option>
+          <option value="3">D# / Eb</option><option value="4">E</option><option value="5">F</option>
+          <option value="6">F# / Gb</option><option value="7">G</option><option value="8">G# / Ab</option>
+          <option value="9">A</option><option value="10">A# / Bb</option><option value="11">B</option>
+        </select>
+        <select id="time-sig" onchange="clearGrid()">
+          <option value="4">4/4 Time</option>
+          <option value="3">3/4 Time</option>
+          <option value="6">6/8 Time</option>
+        </select>
+        <button onclick="addRow()">+ Bar</button>
+        <button onclick="clearGrid()">Clear</button>
+      </div>
+
+      <div id="spreadsheet" class="spreadsheet"></div>
+
+      <div class="library-bar">
+        <input type="text" id="search-voicing" placeholder="Search 1000s of voicings..." oninput="renderLibrary()" style="flex:1;" />
+        <button onclick="saveCurrentKeysAsTemplate()">+ Save Keys as Template</button>
+      </div>
+      <div id="voicing-chips" class="voicing-chips"></div>
+    </div>
+
+    <div id="keyboard-pane" class="pane">
+      <div class="kb-toolbar">
+        <span id="active-notes-display">Tap keys to build a voicing or select a cell</span>
+        <button onclick="clearActiveKeys()">Clear Keys</button>
+      </div>
+      <div id="piano" class="piano"></div>
+    </div>
+  </main>
+
   <script>
     var synth = null;
     var noteNames = "C,C#,D,D#,E,F,F#,G,G#,A,A#,B".split(",");
@@ -88,172 +188,3 @@
 
     function selectCell(idx) {
       selectedCellIndex = idx;
-      renderSpreadsheet();
-      var cell = gridCells.slice(idx, idx + 1).pop();
-      if (cell && cell.midi.length > 0) {
-        activeKeys = new Set(cell.midi);
-        syncKeyboardUI();
-        playMidiNotes(cell.midi);
-      }
-    }
-
-    function applyVoicingToSelectedCell(voicing) {
-      var rootOffset = parseInt(document.getElementById("root-key").value) || 0;
-      var rootName = noteNames[rootOffset];
-      var baseMidi = 48 + rootOffset;
-      var transposedMidi = voicing.intervals.map(function(interval) { return baseMidi + interval; });
-
-      gridCells.splice(selectedCellIndex, 1, { label: rootName + " " + voicing.name, midi: transposedMidi });
-      activeKeys = new Set(transposedMidi);
-      syncKeyboardUI();
-      renderSpreadsheet();
-      playMidiNotes(transposedMidi);
-
-      if (selectedCellIndex < gridCells.length - 1) {
-        selectedCellIndex++;
-        renderSpreadsheet();
-      }
-    }
-
-    function addRow() {
-      var cols = parseInt(document.getElementById("time-sig").value) || 4;
-      for (var i = 0; i < cols; i++) gridCells.push(null);
-      renderSpreadsheet();
-    }
-
-    function clearGrid() {
-      var cols = parseInt(document.getElementById("time-sig").value) || 4;
-      gridCells = [];
-      for (var i = 0; i < cols * 4; i++) gridCells.push(null);
-      selectedCellIndex = 0;
-      renderSpreadsheet();
-    }
-
-    function buildKeyboard() {
-      var piano = document.getElementById("piano");
-      piano.innerHTML = "";
-      for (var midi = 48; midi <= 83; midi++) {
-        (function(m) {
-          var noteIndex = m % 12;
-          var isBlack = (noteIndex === 1 || noteIndex === 3 || noteIndex === 6 || noteIndex === 8 || noteIndex === 10);
-          var key = document.createElement("div");
-          key.className = "key " + (isBlack ? "black-key" : "white-key");
-          key.setAttribute("data-midi", m);
-          if (!isBlack) key.textContent = midiToName(m);
-          key.onclick = function() { togglePianoKey(m); };
-          piano.appendChild(key);
-        })(midi);
-      }
-    }
-
-    function togglePianoKey(midi) {
-      if (activeKeys.has(midi)) {
-        activeKeys.delete(midi);
-      } else {
-        activeKeys.add(midi);
-        var single = [];
-        single.push(midi);
-        playMidiNotes(single, "8n");
-      }
-      syncKeyboardUI();
-    }
-
-    function syncKeyboardUI() {
-      var keys = document.querySelectorAll(".key");
-      keys.forEach(function(k) {
-        var m = parseInt(k.getAttribute("data-midi"));
-        if (activeKeys.has(m)) k.classList.add("active");
-        else k.classList.remove("active");
-      });
-      var sorted = Array.from(activeKeys).sort(function(a, b) { return a - b; });
-      document.getElementById("active-notes-display").textContent =
-        sorted.length ? "Selected: " + sorted.map(midiToName).join(" ") : "Tap keys to build a voicing or select a cell";
-    }
-
-    function clearActiveKeys() {
-      activeKeys.clear();
-      syncKeyboardUI();
-    }
-
-    function saveCurrentKeysAsTemplate() {
-      var sorted = Array.from(activeKeys).sort(function(a, b) { return a - b; });
-      if (sorted.length < 2) {
-        alert("Tap at least 2 notes on the keyboard first to save a voicing template.");
-        return;
-      }
-      var name = prompt("Name this voicing template (e.g., My Dark m11, Gospel Drop-2):");
-      if (!name) return;
-
-      var rootOffset = parseInt(document.getElementById("root-key").value) || 0;
-      var lowestNote = sorted.slice(0, 1).pop();
-      var rootMidi = lowestNote - ((lowestNote - rootOffset) % 12);
-      var intervals = sorted.map(function(m) { return m - rootMidi; });
-
-      voicingLibrary.unshift({ name: name, intervals: intervals });
-      saveLibrary();
-      renderLibrary();
-    }
-
-    function renderLibrary() {
-      var query = document.getElementById("search-voicing").value.toLowerCase();
-      var container = document.getElementById("voicing-chips");
-      container.innerHTML = "";
-
-      voicingLibrary.forEach(function(voicing) {
-        if (voicing.name.toLowerCase().indexOf(query) !== -1) {
-          var chip = document.createElement("div");
-          chip.className = "chip";
-          chip.textContent = voicing.name;
-          chip.onclick = function() { applyVoicingToSelectedCell(voicing); };
-          container.appendChild(chip);
-        }
-      });
-    }
-
-    function setView(mode) {
-      var sheet = document.getElementById("sheet-pane");
-      var keys = document.getElementById("keyboard-pane");
-      document.querySelectorAll("header .btn-group button").forEach(function(b) { b.classList.remove("active"); });
-      document.getElementById("view-" + mode).classList.add("active");
-
-      if (mode === "split") { sheet.classList.remove("hidden"); keys.classList.remove("hidden"); }
-      else if (mode === "sheet") { sheet.classList.remove("hidden"); keys.classList.add("hidden"); }
-      else if (mode === "keys") { sheet.classList.add("hidden"); keys.classList.remove("hidden"); }
-    }
-
-    function togglePlay() {
-      var btn = document.getElementById("play-btn");
-      if (isPlaying) {
-        isPlaying = false;
-        clearInterval(playInterval);
-        btn.textContent = "▶ Play";
-        document.querySelectorAll(".cell").forEach(function(c) { c.classList.remove("playing"); });
-        return;
-      }
-
-      isPlaying = true;
-      btn.textContent = "⏹ Stop";
-      var step = 0;
-
-      var tick = function() {
-        document.querySelectorAll(".cell").forEach(function(c) { c.classList.remove("playing"); });
-        var currentEl = document.getElementById("cell-" + step);
-        if (currentEl) currentEl.classList.add("playing");
-
-        var cell = gridCells.slice(step, step + 1).pop();
-        if (cell && cell.midi.length > 0) {
-          playMidiNotes(cell.midi, "2n");
-          activeKeys = new Set(cell.midi);
-          syncKeyboardUI();
-        }
-        step = (step + 1) % gridCells.length;
-      };
-
-      tick();
-      playInterval = setInterval(tick, 900);
-    }
-
-    function runPrompt() {
-      var raw = document.getElementById("prompt-input").value.trim();
-      if (!raw) return;
-
