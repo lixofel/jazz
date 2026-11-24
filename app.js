@@ -312,3 +312,27 @@ function runPrompt() {
     const quality = qualPart.toLowerCase();
     let matchedVoicing = voicingLibrary.find(v => quality && v.name.toLowerCase().includes(quality));
     if (!matchedVoicing) {
+(quality.includes('m')) matchedVoicing = voicingLibrary.find(v => v.name.toLowerCase().startsWith('m'));
+else if (quality.includes('13') || quality.includes('7') || quality.includes('alt')) matchedVoicing = voicingLibrary.find(v => v.name.includes('13') || v.name.includes('7'));
+else matchedVoicing = voicingLibrary.at(0);
+}
+const baseMidi = 48 + rootIdx;
+gridCells[idx] = {
+label: ${token} (${matchedVoicing.name}),
+midi: matchedVoicing.intervals.map(i => baseMidi + i)
+};
+});
+selectedCellIndex = 0;
+renderSpreadsheet();
+selectCell(0);
+}
+// --- INITIALIZE APP ---
+buildKeyboard();
+renderSpreadsheet();
+renderLibrary();
+
+*(Note: Because `sw.js` cached your first version, if refreshing doesn't immediately show the keyboard and grid, open your Vercel URL in an Incognito/Private tab once or clear site cache for your `.vercel.app` link so your phone loads the updated `app.js`!)*
+
+<FollowUp>
+Replace `app.js` with this fixed version, refresh your Vercel page, and let me know if the **spreadsheet grid**, **voicing chips**, and **virtual piano keyboard** appear right away!
+</FollowUp>
