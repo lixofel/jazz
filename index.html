@@ -184,3 +184,66 @@
           } else {
             div.innerHTML = "<div class='cell-notes'>Beat " + ((index % cols) + 1) + "</div>";
           }
+var raw = document.getElementById("prompt-input").value.trim();
+if (!raw) return;
+if (raw.indexOf("3/4") !== -1) document.getElementById("time-sig").value = "3";
+else if (raw.indexOf("6/8") !== -1) document.getElementById("time-sig").value = "6";
+else if (raw.indexOf("4/4") !== -1) document.getElementById("time-sig").value = "4";
+var cols = parseInt(document.getElementById("time-sig").value) || 4;
+var cleaned = raw.replace("3/4", "").replace("4/4", "").replace("6/8", "");
+var rawParts = cleaned.split("|");
+var tokens = [];
+for (var i = 0; i < rawParts.length; i++) {
+var t = rawParts[i].trim();
+if (t) tokens.push(t);
+}
+if (tokens.length === 0) return;
+var totalCells = Math.max(tokens.length, cols * 2);
+gridCells = [];
+for (var j = 0; j < totalCells; j++) gridCells.push(null);
+var flatMap = { "Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#" };
+for (var idx = 0; idx < tokens.length; idx++) {
+var token = tokens[idx];
+var firstChar = token.charAt(0).toUpperCase();
+if ("ABCDEFG".indexOf(firstChar) === -1) continue;
+var secondChar = token.charAt(1);
+var rootStr = firstChar;
+var qualPart = token.substring(1);
+if (secondChar === "#" || secondChar === "b") {
+rootStr = firstChar + secondChar;
+qualPart = token.substring(2);
+}
+if (flatMap[rootStr]) rootStr = flatMap[rootStr];
+var rootIdx = noteNames.indexOf(rootStr);
+if (rootIdx === -1) continue;
+var quality = qualPart.toLowerCase();
+var matchedVoicing = null;
+for (var v = 0; v < voicingLibrary.length; v++) {
+if (quality && voicingLibrary[v].name.toLowerCase().indexOf(quality) !== -1) {
+matchedVoicing = voicingLibrary[v];
+break;
+}
+}
+if (!matchedVoicing) {
+for (var v2 = 0; v2 < voicingLibrary.length; v2++) {
+var vName = voicingLibrary[v2].name.toLowerCase();
+if (quality.indexOf("m") !== -1 && vName.charAt(0) === "m") { matchedVoicing = voicingLibrary[v2]; break; }
+if ((quality.indexOf("13") !== -1 || quality.indexOf("7") !== -1 || quality.indexOf("alt") !== -1) && (vName.indexOf("13") !== -1 || vName.indexOf("7") !== -1)) { matchedVoicing = voicingLibrary[v2]; break; }
+}
+}
+if (!matchedVoicing) matchedVoicing = voicingLibrary.slice(0, 1).pop();
+var baseMidi = 48 + rootIdx;
+gridCells[idx] = {
+label: token + " (" + matchedVoicing.name + ")",
+midi: matchedVoicing.intervals.map(function(interval) { return baseMidi + interval; })
+};
+}
+selectedCellIndex = 0;
+renderSpreadsheet();
+selectCell(0);
+}
+window.onload = function() {
+buildKeyboard();
+renderSpreadsheet();
+renderLibrary();
+};
