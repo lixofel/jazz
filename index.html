@@ -142,55 +142,14 @@
         <div class="key white-key" data-midi="60" onclick="togglePianoKey(60)">C4</div>
         <div class="key black-key" data-midi="61" onclick="togglePianoKey(61)"></div>
         <div class="key white-key" data-midi="62" onclick="togglePianoKey(62)">D4</div>
-document.getElementById("time-sig").value = "6";
-else if (raw.indexOf("4/4") !== -1) document.getElementById("time-sig").value = "4";
-var cleaned = raw.replace("3/4", "").replace("4/4", "").replace("6/8", "");
-var rawParts = cleaned.split("|");
-var tokens = [];
-rawParts.forEach(function(part) {
-var t = part.trim();
-if (t) tokens.push(t);
-});
-if (tokens.length === 0) return;
-clearGrid();
-var flatMap = { "Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#" };
-tokens.forEach(function(token, idx) {
-if (idx >= gridCells.length) addRow();
-var firstChar = token.charAt(0).toUpperCase();
-if ("ABCDEFG".indexOf(firstChar) === -1) return;
-var secondChar = token.charAt(1);
-var rootStr = firstChar;
-var qualPart = token.substring(1);
-if (secondChar === "#" || secondChar === "b") {
-rootStr = firstChar + secondChar;
-qualPart = token.substring(2);
-}
-if (flatMap[rootStr]) rootStr = flatMap[rootStr];
-var rootIdx = noteNames.indexOf(rootStr);
-if (rootIdx === -1) return;
-var quality = qualPart.toLowerCase();
-var matchedVoicing = null;
-voicingLibrary.forEach(function(v) {
-if (!matchedVoicing && quality && v.name.toLowerCase().indexOf(quality) !== -1) {
-matchedVoicing = v;
-}
-});
-if (!matchedVoicing) {
-voicingLibrary.forEach(function(v) {
-var vName = v.name.toLowerCase();
-if (!matchedVoicing && quality.indexOf("m") !== -1 && vName.charAt(0) === "m") matchedVoicing = v;
-if (!matchedVoicing && (quality.indexOf("13") !== -1 || quality.indexOf("7") !== -1 || quality.indexOf("alt") !== -1) && (vName.indexOf("13") !== -1 || vName.indexOf("7") !== -1)) matchedVoicing = v;
-});
-}
-if (!matchedVoicing) matchedVoicing = voicingLibrary.slice(0, 1).pop();
-var baseMidi = 48 + rootIdx;
-gridCells.splice(idx, 1, {
-label: token + " (" + matchedVoicing.name + ")",
-midi: matchedVoicing.intervals.map(function(interval) { return baseMidi + interval; })
-});
-});
-selectedCellIndex = 0;
-refreshAllCells();
-selectCell(0);
+        <div class="key black-key" data-midi="63" onclick="togglePianoKey(63)"></div>
+        <div class="key white-key" data-midi="64" onclick="togglePianoKey(64)">E4</div>
+        <div class="key white-key" data-midi="65" onclick="togglePianoKey(65)">F4</div>
+        <div class="key black-key" data-midi="66" onclick="togglePianoKey(66)"></div>
+        <div class="key white-key" data-midi="67" onclick="togglePianoKey(67)">G4</div>
+        <div class="key black-key" data-midi="68" onclick="togglePianoKey(68)"></div>
+        <div class="key white-key" data-midi="69" onclick="togglePianoKey(69)">A4</div>
+        <div class="key black-key" data-midi="70" onclick="togglePianoKey(70)"></div>
+        <div class="key white-key" data-midi="71" onclick="togglePianoKey(71)">B4</div>
 }
 renderLibrary();
