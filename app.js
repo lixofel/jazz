@@ -1,0 +1,311 @@
+// --- 1. AUDIO ENGINE (TONE.JS MULTI-TONE SYNTHESIZER) ---
+let synth;
+const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+function initAudio(toneType = 'rhodes') {
+  if (synth) synth.dispose();
+  
+  const presets = {
+    rhodes: {
+      oscillator: { type: 'sine' },
+      envelope: { attack: 0.02, decay: 0.8, sustain: 0.3, release: 1.5 }
+    },
+    grand: {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.01, decay: 1.2, sustain: 0.2, release: 1.8 }
+    },
+    pad: {
+      oscillator: { type: 'sawtooth' },
+      envelope: { attack: 0.4, decay: 0.5, sustain: 0.8, release: 2.0 }
+    },
+    organ: {
+      oscillator: { type: 'square' },
+      envelope: { attack: 0.05, decay: 0.1, sustain: 0.9, release: 0.3 }
+    }
+  };
+
+  synth = new Tone.PolySynth(Tone.Synth, presets[toneType]).toDestination();
+  synth.volume.value = -6;
+}
+
+async function changeTone(toneType) {
+  await Tone.start();
+  initAudio(toneType);
+}
+
+async function playMidiNotes(midiArray, duration = '2n') {
+  if (!synth) initAudio();
+  await Tone.start();
+  const freqs = midiArray.map(m => Tone.Frequency(m, 'midi').toNote());
+  synth.triggerAttackRelease(freqs, duration);
+}
+
+// --- 2. TRANSPOSABLE JAZZ VOICING LIBRARY (LOCALSTORAGE) ---
+const defaultVoicings = [
+  { name: 'Maj9 (Rootless)', intervals: [4, 7, 11, 14] },
+  { name: 'Maj13 (#11)', intervals: [4, 11, 14, 18, 21] },
+  { name: 'm9 (So What)', intervals: [0, 5, 10, 15, 19] },
+  { name: 'm11 (Neo-Soul)', intervals: [0, 7, 10, 14, 15, 17] },
+  { name: '13 (Bill Evans)', intervals: [4, 10, 14, 21] },
+  { name: '7alt (#9 #5)', intervals: [4, 8, 10, 15] },
+  { name: '7b9 (Dim)', intervals: [4, 10, 13, 19] },
+  { name: 'm7b5 (Half-Dim)', intervals: [0, 6, 10, 14] },
+  { name: '6/9', intervals: [4, 9, 14, 19] },
+  { name: 'Sus13', intervals: [5, 10, 14, 21] }
+];
+
+let voicingLibrary = JSON.parse(localStorage.getItem('jazzVoicings')) || defaultVoicings;
+
+function saveLibrary() {
+  localStorage.setItem('jazzVoicings', JSON.stringify(voicingLibrary));
+}
+
+// --- 3. STATE & SPREADSHEET LOGIC ---
+let activeKeys = new Set(); // Stores MIDI numbers (48 = C3 to 83 = B5)
+let selectedCellIndex = 0;
+let gridCells = Array(16).fill(null); // 4 bars of 4/4 by default
+let isPlaying = false;
+let playInterval = null;
+
+function midiToName(midi) {
+  const note = noteNames[midi % 12];
+  const octave = Math.floor(midi / 12) - 1;
+  return `${note}${octave}`;
+}
+
+function renderSpreadsheet() {
+  const container = document.getElementById('spreadsheet');
+  const cols = parseInt(document.getElementById('time-sig').value);
+  container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  container.innerHTML = '';
+
+  gridCells.forEach((cell, idx) => {
+    const div = document.createElement('div');
+    div.className = `cell ${idx === selectedCellIndex ? 'selected' : ''}`;
+    div.id = `cell-${idx}`;
+    div.onclick = () => selectCell(idx);
+
+    if (cell) {
+      div.innerHTML = `
+        <div class="cell-chord">${cell.label}</div>
+        <div class="cell-notes">${cell.midi.map(m => noteNames[m % 12]).join('-')}</div>
+      `;
+    } else {
+      div.innerHTML = `<div class="cell-notes">Beat ${(idx % cols) + 1}</div>`;
+    }
+    container.appendChild(div);
+  });
+}
+
+function selectCell(idx) {
+  selectedCellIndex = idx;
+  renderSpreadsheet();
+  const cell = gridCells[idx];
+  if (cell && cell.midi.length > 0) {
+    activeKeys = new Set(cell.midi);
+    syncKeyboardUI();
+    playMidiNotes(cell.midi);
+  }
+}
+
+function applyVoicingToSelectedCell(voicing) {
+  const rootOffset = parseInt(document.getElementById('root-key').value);
+  const rootName = noteNames[rootOffset];
+  const baseMidi = 48 + rootOffset; // Start around C3
+  const transposedMidi = voicing.intervals.map(interval => baseMidi + interval);
+
+  gridCells[selectedCellIndex] = {
+    label: `${rootName} ${voicing.name}`,
+    midi: transposedMidi
+  };
+
+  activeKeys = new Set(transposedMidi);
+  syncKeyboardUI();
+  renderSpreadsheet();
+  playMidiNotes(transposedMidi);
+
+  // Auto-advance to next cell for fast composition
+  if (selectedCellIndex < gridCells.length - 1) {
+    selectedCellIndex++;
+    renderSpreadsheet();
+  }
+}
+
+function addRow() {
+  const cols = parseInt(document.getElementById('time-sig').value);
+  gridCells.push(...Array(cols).fill(null));
+  renderSpreadsheet();
+}
+
+function clearGrid() {
+  const cols = parseInt(document.getElementById('time-sig').value);
+  gridCells = Array(cols * 4).fill(null);
+  selectedCellIndex = 0;
+  renderSpreadsheet();
+}
+
+function rebuildGrid() {
+  clearGrid();
+}
+
+// --- 4. VIRTUAL KEYBOARD & VOICING CREATOR ---
+function buildKeyboard() {
+  const piano = document.getElementById('piano');
+  piano.innerHTML = '';
+  // Build 3 octaves: C3 (48) to B5 (83)
+  for (let midi = 48; midi <= 83; midi++) {
+    const noteIndex = midi % 12;
+    const isBlack = [1, 3, 6, 8, 10].includes(noteIndex);
+    const key = document.createElement('div');
+    key.className = `key ${isBlack ? 'black-key' : 'white-key'}`;
+    key.dataset.midi = midi;
+    if (!isBlack) key.textContent = midiToName(midi);
+
+    key.onclick = () => togglePianoKey(midi);
+    piano.appendChild(key);
+  }
+}
+
+function togglePianoKey(midi) {
+  if (activeKeys.has(midi)) {
+    activeKeys.delete(midi);
+  } else {
+    activeKeys.add(midi);
+    playMidiNotes([midi], '8n');
+  }
+  syncKeyboardUI();
+}
+
+function syncKeyboardUI() {
+  document.querySelectorAll('.key').forEach(k => {
+    const m = parseInt(k.dataset.midi);
+    k.classList.toggle('active', activeKeys.has(m));
+  });
+  const sorted = Array.from(activeKeys).sort((a, b) => a - b);
+  document.getElementById('active-notes-display').textContent = 
+    sorted.length ? `Selected: ${sorted.map(midiToName).join(' ')}` : 'Tap keys to build a voicing or select a cell';
+}
+
+function clearActiveKeys() {
+  activeKeys.clear();
+  syncKeyboardUI();
+}
+
+function saveCurrentKeysAsTemplate() {
+  const sorted = Array.from(activeKeys).sort((a, b) => a - b);
+  if (sorted.length < 2) {
+    alert('Tap at least 2 notes on the keyboard first to save a voicing template.');
+    return;
+  }
+  const name = prompt('Name this voicing template (e.g., My Dark m11, Gospel Drop-2):');
+  if (!name) return;
+
+  // Convert notes relative to the current selected Key so it transposes to ANY key
+  const rootOffset = parseInt(document.getElementById('root-key').value);
+  const lowestNote = sorted[0];
+  const rootMidi = lowestNote - ((lowestNote - rootOffset) % 12);
+  const intervals = sorted.map(m => m - rootMidi);
+
+  voicingLibrary.unshift({ name, intervals });
+  saveLibrary();
+  renderLibrary();
+}
+
+function renderLibrary() {
+  const query = document.getElementById('search-voicing').value.toLowerCase();
+  const container = document.getElementById('voicing-chips');
+  container.innerHTML = '';
+
+  voicingLibrary
+    .filter(v => v.name.toLowerCase().includes(query))
+    .forEach(voicing => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.textContent = voicing.name;
+      chip.onclick = () => applyVoicingToSelectedCell(voicing);
+      container.appendChild(chip);
+    });
+}
+
+// --- 5. VIEW TOGGLES & PLAYBACK SEQUENCER ---
+function setView(mode) {
+  const sheet = document.getElementById('sheet-pane');
+  const keys = document.getElementById('keyboard-pane');
+  document.querySelectorAll('header .btn-group button').forEach(b => b.classList.remove('active'));
+  document.getElementById(`view-${mode}`).classList.add('active');
+
+  if (mode === 'split') {
+    sheet.classList.remove('hidden');
+    keys.classList.remove('hidden');
+  } else if (mode === 'sheet') {
+    sheet.classList.remove('hidden');
+    keys.classList.add('hidden');
+  } else if (mode === 'keys') {
+    sheet.classList.add('hidden');
+    keys.classList.remove('hidden');
+  }
+}
+
+async function togglePlay() {
+  const btn = document.getElementById('play-btn');
+  if (isPlaying) {
+    isPlaying = false;
+    clearInterval(playInterval);
+    btn.textContent = '▶ Play';
+    document.querySelectorAll('.cell').forEach(c => c.classList.remove('playing'));
+    return;
+  }
+
+  await Tone.start();
+  if (!synth) initAudio();
+  isPlaying = true;
+  btn.textContent = '⏹ Stop';
+  let step = 0;
+
+  const tick = () => {
+    document.querySelectorAll('.cell').forEach(c => c.classList.remove('playing'));
+    const currentEl = document.getElementById(`cell-${step}`);
+    if (currentEl) currentEl.classList.add('playing');
+
+    const cell = gridCells[step];
+    if (cell && cell.midi.length > 0) {
+      playMidiNotes(cell.midi, '2n');
+      activeKeys = new Set(cell.midi);
+      syncKeyboardUI();
+    }
+    step = (step + 1) % gridCells.length;
+  };
+
+  tick();
+  playInterval = setInterval(tick, 900); // ~67 BPM jazz ballad feel
+}
+
+// --- 6. PROMPT-TO-MUSIC PARSER ---
+function runPrompt() {
+  const raw = document.getElementById('prompt-input').value.trim();
+  if (!raw) return;
+
+  // Check for time signature in prompt (e.g. 3/4, 4/4, 6/8)
+  if (raw.includes('3/4')) document.getElementById('time-sig').value = '3';
+  else if (raw.includes('6/8')) document.getElementById('time-sig').value = '6';
+  else if (raw.includes('4/4')) document.getElementById('time-sig').value = '4';
+
+  const cols = parseInt(document.getElementById('time-sig').value);
+  // Extract chord tokens separated by | or spaces
+  const tokens = raw.replace(/3\/4|4\/4|6\/8/g, '').split(/[\|,]+/).map(s => s.trim()).filter(Boolean);
+  
+  if (tokens.length === 0) return;
+
+  gridCells = Array(Math.max(tokens.length, cols * 2)).fill(null);
+
+  tokens.forEach((token, idx) => {
+    // Match root note (e.g., Db, F#, C)
+    const match = token.match(/^([A-G][#b]?)(.*)$/i);
+    if (!match) return;
+
+    let rootStr = match[1].charAt(0).toUpperCase() + (match[1].slice(1) || '');
+    const flatMap = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
+    if (flatMap[rootStr]) rootStr = flatMap[rootStr];
+
+    const rootIdx = noteNames.indexOf(rootStr);
+    if (rootIdx === -1) return;
