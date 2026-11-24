@@ -154,35 +154,154 @@
       </div>
         <script>
     var ac = null;
-    var toneType = "sine";
+    var masterComp = null;
+    var toneMode = "rhodes";
     var sel = 0;
+    var isPlaying = false;
+    var playTimer = null;
     var gridData = {};
     var notes = "C,C#,D,D#,E,F,F#,G,G#,A,A#,B".split(",");
-    var chords = "4-7-11-14,4-11-14-18-21,3-8-13-18-22,3-7-10-14-17,4-10-14-21,4-8-10-15,4-7-10-13-21,3-6-10-14,4-9-14-19,5-10-14-21".split(",");
-    var chordNames = "Maj9,Maj13,m9,m11,13,7alt,7b9,m7b5,6/9,Sus13".split(",");
 
-    function playNote(m) {
+    var defaultTemplates = [
+      { name: "Maj9 (Rootless)", intervals: "4,7,11,14" },
+      { name: "Maj13 (#11)", intervals: "4,11,14,18,21" },
+      { name: "m9 (So What)", intervals: "3,8,13,18,22" },
+      { name: "m11 (Neo-Soul)", intervals: "3,7,10,14,17" },
+      { name: "13 (Bill Evans)", intervals: "4,10,14,21" },
+      { name: "7alt (#9 #5)", intervals: "4,8,10,15" },
+      { name: "7b9 (Dim)", intervals: "4,7,10,13,21" },
+      { name: "m7b5 (Half-Dim)", intervals: "3,6,10,14" },
+      { name: "6/9", intervals: "4,9,14,19" },
+      { name: "Sus13", intervals: "5,10,14,21" }
+    ];
+
+    var library = defaultTemplates;
+    try {
+      var savedLib = localStorage.getItem("jazzVoicingsPro");
+      if (savedLib) library = JSON.parse(savedLib);
+    } catch (e) {}
+
+    function saveLibraryToPhone() {
+      try { localStorage.setItem("jazzVoicingsPro", JSON.stringify(library)); } catch (e) {}
+    }
+
+    function initAudioEngine() {
       var AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!ac) ac = new AudioCtx();
+      if (!ac) {
+        ac = new AudioCtx();
+        masterComp = ac.createDynamicsCompressor();
+        masterComp.threshold.value = -18;
+        masterComp.knee.value = 12;
+        masterComp.ratio.value = 4;
+        masterComp.attack.value = 0.01;
+        masterComp.release.value = 0.25;
+        masterComp.connect(ac.destination);
+      }
       if (ac.state === "suspended") ac.resume();
-      var osc = ac.createOscillator();
-      var g = ac.createGain();
-      osc.type = toneType;
-      osc.frequency.value = 440 * Math.pow(2, (m - 69) / 12);
-      g.gain.setValueAtTime(0.25, ac.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 1.0);
-      osc.connect(g);
-      g.connect(ac.destination);
-      osc.start();
-      osc.stop(ac.currentTime + 1.0);
+    }
+
+    function playNote(m, holdSec) {
+      initAudioEngine();
+      var now = ac.currentTime;
+      var dur = holdSec || 1.3;
+      var freq = 440 * Math.pow(2, (m - 69) / 12);
+
+      var filter = ac.createBiquadFilter();
+      filter.type = "lowpass";
+      var env = ac.createGain();
+
+      var osc1 = ac.createOscillator();
+      var osc2 = ac.createOscillator();
+      var osc2Gain = ac.createGain();
+
+      if (toneMode === "rhodes") {
+        osc1.type = "sine";
+        osc1.frequency.value = freq;
+        osc2.type = "triangle";
+        osc2.frequency.value = freq * 2;
+        osc2Gain.gain.setValueAtTime(0.14, now);
+        osc2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+        filter.frequency.setValueAtTime(1800, now);
+        filter.frequency.exponentialRampToValueAtTime(650, now + dur);
+
+        env.gain.setValueAtTime(0.001, now);
+        env.gain.linearRampToValueAtTime(0.24, now + 0.015);
+        env.gain.exponentialRampToValueAtTime(0.0008, now + dur);
+      } else if (toneMode === "grand") {
+        osc1.type = "triangle";
+        osc1.frequency.value = freq;
+        osc2.type = "sine";
+        osc2.frequency.value = freq * 2;
+        osc2Gain.gain.setValueAtTime(0.18, now);
+        osc2Gain.gain.exponentialRampToValueAtTime(0.002, now + dur * 0.7);
+
+        filter.frequency.setValueAtTime(2400, now);
+        filter.frequency.exponentialRampToValueAtTime(500, now + dur);
+
+        env.gain.setValueAtTime(0.001, now);
+        env.gain.linearRampToValueAtTime(0.26, now + 0.01);
+        env.gain.exponentialRampToValueAtTime(0.0008, now + dur * 1.15);
+      } else if (toneMode === "pad") {
+        dur = Math.max(dur, 1.8);
+        osc1.type = "sawtooth";
+        osc1.frequency.value = freq * 0.997;
+        osc2.type = "sawtooth";
+        osc2.frequency.value = freq * 1.003;
+        osc2Gain.gain.setValueAtTime(0.5, now);
+
+        filter.frequency.setValueAtTime(400, now);
+        filter.frequency.linearRampToValueAtTime(1100, now + 0.5);
+        filter.frequency.exponentialRampToValueAtTime(450, now + dur);
+
+        env.gain.setValueAtTime(0.001, now);
+        env.gain.linearRampToValueAtTime(0.16, now + 0.28);
+        env.gain.exponentialRampToValueAtTime(0.0008, now + dur);
+      } else {
+        osc1.type = "sine";
+        osc1.frequency.value = freq;
+        osc2.type = "sine";
+        osc2.frequency.value = freq * 3;
+        osc2Gain.gain.setValueAtTime(0.16, now);
+
+        filter.frequency.value = 1600;
+        env.gain.setValueAtTime(0.001, now);
+        env.gain.linearRampToValueAtTime(0.22, now + 0.03);
+        env.gain.setValueAtTime(0.20, now + dur * 0.8);
+        env.gain.exponentialRampToValueAtTime(0.0008, now + dur);
+      }
+
+      osc1.connect(filter);
+      osc2.connect(osc2Gain);
+      osc2Gain.connect(filter);
+      filter.connect(env);
+      env.connect(masterComp);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + dur + 0.1);
+      osc2.stop(now + dur + 0.1);
     }
 
     function changeTone(val) {
-      if (val === "grand") toneType = "triangle";
-      else if (val === "pad") toneType = "sawtooth";
-      else if (val === "organ") toneType = "square";
-      else toneType = "sine";
-      playNote(60);
+      toneMode = val;
+      playNote(60, 0.6);
+      playNote(64, 0.6);
+      playNote(67, 0.6);
+      playNote(71, 0.6);
+    }
+
+    function updateKeyDisplay() {
+      var active = [];
+      var all = document.querySelectorAll(".key");
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].classList.contains("active")) {
+          var m = parseInt(all[i].getAttribute("data-midi"));
+          active.push(notes[m % 12] + (Math.floor(m / 12) - 1));
+        }
+      }
+      var disp = document.getElementById("active-notes-display");
+      if (disp) disp.textContent = active.length ? "Notes: " + active.join(" - ") : "Studio Ready - Tap keys or select a cell";
     }
 
     function togglePianoKey(m) {
@@ -193,15 +312,17 @@
             all[i].classList.remove("active");
           } else {
             all[i].classList.add("active");
-            playNote(m);
+            playNote(m, 0.9);
           }
         }
       }
+      updateKeyDisplay();
     }
 
     function clearActiveKeys() {
       var all = document.querySelectorAll(".key");
       for (var i = 0; i < all.length; i++) all[i].classList.remove("active");
+      updateKeyDisplay();
     }
 
     function selectCell(idx) {
@@ -214,32 +335,122 @@
       if (gridData[idx]) {
         clearActiveKeys();
         var list = gridData[idx].split(",");
-        for (var j = 0; j < list.length; j++) togglePianoKey(parseInt(list[j]));
+        for (var j = 0; j < list.length; j++) {
+          var m = parseInt(list[j]);
+          var all = document.querySelectorAll(".key");
+          for (var k = 0; k < all.length; k++) {
+            if (parseInt(all[k].getAttribute("data-midi")) === m) all[k].classList.add("active");
+          }
+          playNote(m, 1.3);
+        }
+        updateKeyDisplay();
       }
     }
 
-    function applyPreset(pIdx) {
+    function applyTemplateObj(tpl) {
       var root = parseInt(document.getElementById("root-key").value) || 0;
-      var intervals = chords[pIdx].split("-");
+      var intervals = tpl.intervals.split(",");
       var midis = [];
       clearActiveKeys();
       for (var i = 0; i < intervals.length; i++) {
         var m = 48 + root + parseInt(intervals[i]);
         midis.push(m);
-        togglePianoKey(m);
+        var all = document.querySelectorAll(".key");
+        for (var k = 0; k < all.length; k++) {
+          if (parseInt(all[k].getAttribute("data-midi")) === m) all[k].classList.add("active");
+        }
+        playNote(m, 1.3);
       }
+      updateKeyDisplay();
       gridData[sel] = midis.join(",");
       var box = document.getElementById("cell-" + sel);
-      if (box) box.textContent = notes[root] + " " + chordNames[pIdx];
-      if (sel < 15) selectCell(sel + 1);
+      if (box) box.textContent = notes[root] + " " + tpl.name;
+
+      var totalCells = document.querySelectorAll(".cell").length;
+      if (sel < totalCells - 1) selectCell(sel + 1);
     }
 
-    function setView(mode) {
-      var s = document.getElementById("sheet-pane");
-      var k = document.getElementById("keyboard-pane");
-      s.style.display = (mode === "keys") ? "none" : "block";
-      k.style.display = (mode === "sheet") ? "none" : "flex";
+    function applyPreset(pIdx) {
+      if (library[pIdx]) applyTemplateObj(library[pIdx]);
     }
-  </script>
-</body>
-</html>
+
+    function renderLibrary() {
+      var q = document.getElementById("search-voicing").value.toLowerCase();
+      var box = document.getElementById("voicing-chips");
+      box.innerHTML = "";
+      for (var i = 0; i < library.length; i++) {
+        (function(tpl) {
+          if (tpl.name.toLowerCase().indexOf(q) !== -1) {
+            var chip = document.createElement("div");
+            chip.className = "chip";
+            chip.textContent = tpl.name;
+            chip.onclick = function() { applyTemplateObj(tpl); };
+            box.appendChild(chip);
+          }
+        })(library[i]);
+      }
+    }
+
+    function saveCurrentKeysAsTemplate() {
+      var active = [];
+      var all = document.querySelectorAll(".key");
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].classList.contains("active")) {
+          active.push(parseInt(all[i].getAttribute("data-midi")));
+        }
+      }
+      active.sort(function(a, b) { return a - b; });
+      if (active.length < 2) {
+        alert("Tap at least 2 piano keys first to save a custom voicing template.");
+        return;
+      }
+      var name = prompt("Name this voicing template (e.g. Gospel Drop-2, Dark m11):");
+      if (!name) return;
+
+      var root = parseInt(document.getElementById("root-key").value) || 0;
+      var baseRoot = 48 + root;
+      var lowest = active.slice(0, 1).pop();
+      while (baseRoot > lowest) baseRoot -= 12;
+
+      var rel = [];
+      for (var j = 0; j < active.length; j++) rel.push(active[j] - baseRoot);
+
+      library.unshift({ name: name, intervals: rel.join(",") });
+      saveLibraryToPhone();
+      renderLibrary();
+    }
+
+    function addRow() {
+      var sheet = document.getElementById("spreadsheet");
+      var cols = parseInt(document.getElementById("time-sig").value) || 4;
+      var currentCount = document.querySelectorAll(".cell").length;
+      for (var i = 0; i < cols; i++) {
+        var idx = currentCount + i;
+        var div = document.createElement("div");
+        div.className = "cell";
+        div.id = "cell-" + idx;
+        div.textContent = "Beat " + ((idx % cols) + 1);
+        (function(cIdx) { div.onclick = function() { selectCell(cIdx); }; })(idx);
+        sheet.appendChild(div);
+      }
+    }
+
+    function clearGrid() {
+      if (!match) match = library.slice(0, 1).pop();
+var intervals = match.intervals.split(",");
+var midis = [];
+for (var k = 0; k < intervals.length; k++) midis.push(48 + rootIdx + parseInt(intervals[k]));
+gridData[idx] = midis.join(",");
+var box = document.getElementById("cell-" + idx);
+if (box) box.textContent = tok + " (" + match.name + ")";
+}
+selectCell(0);
+}
+function setView(mode) {
+var s = document.getElementById("sheet-pane");
+var k = document.getElementById("keyboard-pane");
+var btns = document.querySelectorAll("header .btn-group button");
+for (var i = 0; i < btns.length; i++) btns[i].classList.remove("active");
+document.getElementById("view-" + mode).classList.add("active");
+s.style.display = (mode === "keys") ? "none" : "block";
+k.style.display = (mode === "sheet") ? "none" : "flex";
