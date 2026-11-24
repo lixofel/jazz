@@ -1,29 +1,14 @@
-// --- 1. AUDIO ENGINE (TONE.JS MULTI-TONE SYNTHESIZER) ---
 let synth;
 const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 function initAudio(toneType = 'rhodes') {
   if (synth) synth.dispose();
-  
   const presets = {
-    rhodes: {
-      oscillator: { type: 'sine' },
-      envelope: { attack: 0.02, decay: 0.8, sustain: 0.3, release: 1.5 }
-    },
-    grand: {
-      oscillator: { type: 'triangle' },
-      envelope: { attack: 0.01, decay: 1.2, sustain: 0.2, release: 1.8 }
-    },
-    pad: {
-      oscillator: { type: 'sawtooth' },
-      envelope: { attack: 0.4, decay: 0.5, sustain: 0.8, release: 2.0 }
-    },
-    organ: {
-      oscillator: { type: 'square' },
-      envelope: { attack: 0.05, decay: 0.1, sustain: 0.9, release: 0.3 }
-    }
+    rhodes: { oscillator: { type: 'sine' }, envelope: { attack: 0.02, decay: 0.8, sustain: 0.3, release: 1.5 } },
+    grand: { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 1.2, sustain: 0.2, release: 1.8 } },
+    pad: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.4, decay: 0.5, sustain: 0.8, release: 2.0 } },
+    organ: { oscillator: { type: 'square' }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.9, release: 0.3 } }
   };
-
   synth = new Tone.PolySynth(Tone.Synth, presets[toneType]).toDestination();
   synth.volume.value = -6;
 }
@@ -40,18 +25,17 @@ async function playMidiNotes(midiArray, duration = '2n') {
   synth.triggerAttackRelease(freqs, duration);
 }
 
-// --- 2. TRANSPOSABLE JAZZ VOICING LIBRARY (LOCALSTORAGE) ---
 const defaultVoicings = [
-  { name: 'Maj9 (Rootless)', intervals: new Array(4, 7, 11, 14) },
-  { name: 'Maj13 (#11)', intervals: new Array(4, 11, 14, 18, 21) },
-  { name: 'm9 (So What)', intervals: new Array(3, 8, 13, 18, 22) },
-  { name: 'm11 (Neo-Soul)', intervals: new Array(3, 7, 10, 14, 17) },
-  { name: '13 (Bill Evans)', intervals: new Array(4, 10, 14, 21) },
-  { name: '7alt (#9 #5)', intervals: new Array(4, 8, 10, 15) },
-  { name: '7b9 (Dim)', intervals: new Array(4, 7, 10, 13, 21) },
-  { name: 'm7b5 (Half-Dim)', intervals: new Array(3, 6, 10, 14) },
-  { name: '6/9', intervals: new Array(4, 9, 14, 19) },
-  { name: 'Sus13', intervals: new Array(5, 10, 14, 21) }
+  { name: 'Maj9 (Rootless)', intervals: [4, 7, 11, 14] },
+  { name: 'Maj13 (#11)', intervals: [4, 11, 14, 18, 21] },
+  { name: 'm9 (So What)', intervals: [3, 8, 13, 18, 22] },
+  { name: 'm11 (Neo-Soul)', intervals: [3, 7, 10, 14, 17] },
+  { name: '13 (Bill Evans)', intervals: [4, 10, 14, 21] },
+  { name: '7alt (#9 #5)', intervals: [4, 8, 10, 15] },
+  { name: '7b9 (Dim)', intervals: [4, 7, 10, 13, 21] },
+  { name: 'm7b5 (Half-Dim)', intervals: [3, 6, 10, 14] },
+  { name: '6/9', intervals: [4, 9, 14, 19] },
+  { name: 'Sus13', intervals: [5, 10, 14, 21] }
 ];
 
 let voicingLibrary = JSON.parse(localStorage.getItem('jazzVoicings')) || defaultVoicings;
@@ -60,7 +44,6 @@ function saveLibrary() {
   localStorage.setItem('jazzVoicings', JSON.stringify(voicingLibrary));
 }
 
-// --- 3. STATE & SPREADSHEET LOGIC ---
 let activeKeys = new Set();
 let selectedCellIndex = 0;
 let gridCells = Array(16).fill(null);
@@ -86,10 +69,7 @@ function renderSpreadsheet() {
     div.onclick = () => selectCell(idx);
 
     if (cell) {
-      div.innerHTML = `
-        <div class="cell-chord">${cell.label}</div>
-        <div class="cell-notes">${cell.midi.map(m => noteNames[m % 12]).join('-')}</div>
-      `;
+      div.innerHTML = `<div class="cell-chord">${cell.label}</div><div class="cell-notes">${cell.midi.map(m => noteNames[m % 12]).join('-')}</div>`;
     } else {
       div.innerHTML = `<div class="cell-notes">Beat ${(idx % cols) + 1}</div>`;
     }
@@ -114,11 +94,7 @@ function applyVoicingToSelectedCell(voicing) {
   const baseMidi = 48 + rootOffset;
   const transposedMidi = voicing.intervals.map(interval => baseMidi + interval);
 
-  gridCells[selectedCellIndex] = {
-    label: `${rootName} ${voicing.name}`,
-    midi: transposedMidi
-  };
-
+  gridCells[selectedCellIndex] = { label: `${rootName} ${voicing.name}`, midi: transposedMidi };
   activeKeys = new Set(transposedMidi);
   syncKeyboardUI();
   renderSpreadsheet();
@@ -147,7 +123,6 @@ function rebuildGrid() {
   clearGrid();
 }
 
-// --- 4. VIRTUAL KEYBOARD & VOICING CREATOR ---
 function buildKeyboard() {
   const piano = document.getElementById('piano');
   piano.innerHTML = '';
@@ -171,7 +146,7 @@ function togglePianoKey(midi) {
     activeKeys.delete(midi);
   } else {
     activeKeys.add(midi);
-    playMidiNotes(new Array(midi), '8n');
+    playMidiNotes([midi], '8n');
   }
   syncKeyboardUI();
 }
@@ -201,7 +176,7 @@ function saveCurrentKeysAsTemplate() {
   if (!name) return;
 
   const rootOffset = parseInt(document.getElementById('root-key').value);
-  const lowestNote = sorted.at(0);
+  const lowestNote = sorted[0];
   const rootMidi = lowestNote - ((lowestNote - rootOffset) % 12);
   const intervals = sorted.map(m => m - rootMidi);
 
@@ -226,7 +201,6 @@ function renderLibrary() {
     });
 }
 
-// --- 5. VIEW TOGGLES & PLAYBACK SEQUENCER ---
 function setView(mode) {
   const sheet = document.getElementById('sheet-pane');
   const keys = document.getElementById('keyboard-pane');
@@ -279,7 +253,6 @@ async function togglePlay() {
   playInterval = setInterval(tick, 900);
 }
 
-// --- 6. PROMPT-TO-MUSIC PARSER ---
 function runPrompt() {
   const raw = document.getElementById('prompt-input').value.trim();
   if (!raw) return;
@@ -290,7 +263,6 @@ function runPrompt() {
 
   const cols = parseInt(document.getElementById('time-sig').value);
   const tokens = raw.replace(/3\/4|4\/4|6\/8/g, '').split(/[\|,]+/).map(s => s.trim()).filter(Boolean);
-  
   if (tokens.length === 0) return;
 
   gridCells = Array(Math.max(tokens.length, cols * 2)).fill(null);
@@ -299,8 +271,8 @@ function runPrompt() {
     const match = token.match(/^([A-G][#b]?)(.*)$/i);
     if (!match) return;
 
-    const notePart = match.at(1);
-    const qualPart = match.at(2) || '';
+    const notePart = match[1];
+    const qualPart = match[2] || '';
 
     let rootStr = notePart.charAt(0).toUpperCase() + (notePart.slice(1) || '');
     const flatMap = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
@@ -312,27 +284,33 @@ function runPrompt() {
     const quality = qualPart.toLowerCase();
     let matchedVoicing = voicingLibrary.find(v => quality && v.name.toLowerCase().includes(quality));
     if (!matchedVoicing) {
-(quality.includes('m')) matchedVoicing = voicingLibrary.find(v => v.name.toLowerCase().startsWith('m'));
-else if (quality.includes('13') || quality.includes('7') || quality.includes('alt')) matchedVoicing = voicingLibrary.find(v => v.name.includes('13') || v.name.includes('7'));
-else matchedVoicing = voicingLibrary.at(0);
-}
-const baseMidi = 48 + rootIdx;
-gridCells[idx] = {
-label: ${token} (${matchedVoicing.name}),
-midi: matchedVoicing.intervals.map(i => baseMidi + i)
-};
-});
-selectedCellIndex = 0;
-renderSpreadsheet();
+      if (quality.includes('m')) matchedVoicing = voicingLibrary.find(v => v.name.toLowerCase().startsWith('m'));
+      else if (quality.includes('13') || quality.includes('7') || quality.includes('alt')) matchedVoicing = voicingLibrary.find(v => v.name.includes('13') || v.name.includes('7'));
+      else matchedVoicing = voicingLibrary[0];
+    }
+
+    const baseMidi = 48 + rootIdx;
+    gridCells[idx] = {
+      label: `${token} (${matchedVoicing.name})`,
+      midi: matchedVoicing.intervals.map(i => baseMidi + i)
+    };
+  });
+
+  selectedCellIndex = 0;
+  renderSpreadsheet(); 
 selectCell(0);
 }
-// --- INITIALIZE APP ---
 buildKeyboard();
 renderSpreadsheet();
 renderLibrary();
+</details>
 
-*(Note: Because `sw.js` cached your first version, if refreshing doesn't immediately show the keyboard and grid, open your Vercel URL in an Incognito/Private tab once or clear site cache for your `.vercel.app` link so your phone loads the updated `app.js`!)*
+---
+
+### Step 3: Refresh Twice on Your S22 Ultra
+1. Wait 15 seconds for Vercel to finish deploying.
+2. Open your `.vercel.app` link and **pull down to refresh the page once** (this activates the new `sw.js` and wipes the old cache), then **refresh a second time**—your 16-beat spreadsheet grid, jazz chord chips, and black-and-white piano keyboard will immediately pop onto the screen!
 
 <FollowUp>
-Replace `app.js` with this fixed version, refresh your Vercel page, and let me know if the **spreadsheet grid**, **voicing chips**, and **virtual piano keyboard** appear right away!
+After updating `sw.js` and `app.js` and refreshing twice, let me know if the **keyboard and spreadsheet grid** appear and play sound!
 </FollowUp>
