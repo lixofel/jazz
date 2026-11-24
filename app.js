@@ -42,16 +42,16 @@ async function playMidiNotes(midiArray, duration = '2n') {
 
 // --- 2. TRANSPOSABLE JAZZ VOICING LIBRARY (LOCALSTORAGE) ---
 const defaultVoicings = [
-  { name: 'Maj9 (Rootless)', intervals: [4, 7, 11, 14] },
-  { name: 'Maj13 (#11)', intervals: [4, 11, 14, 18, 21] },
-  { name: 'm9 (So What)', intervals: [0, 5, 10, 15, 19] },
-  { name: 'm11 (Neo-Soul)', intervals: [0, 7, 10, 14, 15, 17] },
-  { name: '13 (Bill Evans)', intervals: [4, 10, 14, 21] },
-  { name: '7alt (#9 #5)', intervals: [4, 8, 10, 15] },
-  { name: '7b9 (Dim)', intervals: [4, 10, 13, 19] },
-  { name: 'm7b5 (Half-Dim)', intervals: [0, 6, 10, 14] },
-  { name: '6/9', intervals: [4, 9, 14, 19] },
-  { name: 'Sus13', intervals: [5, 10, 14, 21] }
+  { name: 'Maj9 (Rootless)', intervals: new Array(4, 7, 11, 14) },
+  { name: 'Maj13 (#11)', intervals: new Array(4, 11, 14, 18, 21) },
+  { name: 'm9 (So What)', intervals: new Array(3, 8, 13, 18, 22) },
+  { name: 'm11 (Neo-Soul)', intervals: new Array(3, 7, 10, 14, 17) },
+  { name: '13 (Bill Evans)', intervals: new Array(4, 10, 14, 21) },
+  { name: '7alt (#9 #5)', intervals: new Array(4, 8, 10, 15) },
+  { name: '7b9 (Dim)', intervals: new Array(4, 7, 10, 13, 21) },
+  { name: 'm7b5 (Half-Dim)', intervals: new Array(3, 6, 10, 14) },
+  { name: '6/9', intervals: new Array(4, 9, 14, 19) },
+  { name: 'Sus13', intervals: new Array(5, 10, 14, 21) }
 ];
 
 let voicingLibrary = JSON.parse(localStorage.getItem('jazzVoicings')) || defaultVoicings;
@@ -61,9 +61,9 @@ function saveLibrary() {
 }
 
 // --- 3. STATE & SPREADSHEET LOGIC ---
-let activeKeys = new Set(); // Stores MIDI numbers (48 = C3 to 83 = B5)
+let activeKeys = new Set();
 let selectedCellIndex = 0;
-let gridCells = Array(16).fill(null); // 4 bars of 4/4 by default
+let gridCells = Array(16).fill(null);
 let isPlaying = false;
 let playInterval = null;
 
@@ -111,7 +111,7 @@ function selectCell(idx) {
 function applyVoicingToSelectedCell(voicing) {
   const rootOffset = parseInt(document.getElementById('root-key').value);
   const rootName = noteNames[rootOffset];
-  const baseMidi = 48 + rootOffset; // Start around C3
+  const baseMidi = 48 + rootOffset;
   const transposedMidi = voicing.intervals.map(interval => baseMidi + interval);
 
   gridCells[selectedCellIndex] = {
@@ -124,7 +124,6 @@ function applyVoicingToSelectedCell(voicing) {
   renderSpreadsheet();
   playMidiNotes(transposedMidi);
 
-  // Auto-advance to next cell for fast composition
   if (selectedCellIndex < gridCells.length - 1) {
     selectedCellIndex++;
     renderSpreadsheet();
@@ -152,10 +151,11 @@ function rebuildGrid() {
 function buildKeyboard() {
   const piano = document.getElementById('piano');
   piano.innerHTML = '';
-  // Build 3 octaves: C3 (48) to B5 (83)
+  const blackNotes = new Set([1, 3, 6, 8, 10]);
+
   for (let midi = 48; midi <= 83; midi++) {
     const noteIndex = midi % 12;
-    const isBlack = [1, 3, 6, 8, 10].includes(noteIndex);
+    const isBlack = blackNotes.has(noteIndex);
     const key = document.createElement('div');
     key.className = `key ${isBlack ? 'black-key' : 'white-key'}`;
     key.dataset.midi = midi;
@@ -171,7 +171,7 @@ function togglePianoKey(midi) {
     activeKeys.delete(midi);
   } else {
     activeKeys.add(midi);
-    playMidiNotes([midi], '8n');
+    playMidiNotes(new Array(midi), '8n');
   }
   syncKeyboardUI();
 }
@@ -200,9 +200,8 @@ function saveCurrentKeysAsTemplate() {
   const name = prompt('Name this voicing template (e.g., My Dark m11, Gospel Drop-2):');
   if (!name) return;
 
-  // Convert notes relative to the current selected Key so it transposes to ANY key
   const rootOffset = parseInt(document.getElementById('root-key').value);
-  const lowestNote = sorted[0];
+  const lowestNote = sorted.at(0);
   const rootMidi = lowestNote - ((lowestNote - rootOffset) % 12);
   const intervals = sorted.map(m => m - rootMidi);
 
@@ -277,7 +276,7 @@ async function togglePlay() {
   };
 
   tick();
-  playInterval = setInterval(tick, 900); // ~67 BPM jazz ballad feel
+  playInterval = setInterval(tick, 900);
 }
 
 // --- 6. PROMPT-TO-MUSIC PARSER ---
@@ -285,13 +284,11 @@ function runPrompt() {
   const raw = document.getElementById('prompt-input').value.trim();
   if (!raw) return;
 
-  // Check for time signature in prompt (e.g. 3/4, 4/4, 6/8)
   if (raw.includes('3/4')) document.getElementById('time-sig').value = '3';
   else if (raw.includes('6/8')) document.getElementById('time-sig').value = '6';
   else if (raw.includes('4/4')) document.getElementById('time-sig').value = '4';
 
   const cols = parseInt(document.getElementById('time-sig').value);
-  // Extract chord tokens separated by | or spaces
   const tokens = raw.replace(/3\/4|4\/4|6\/8/g, '').split(/[\|,]+/).map(s => s.trim()).filter(Boolean);
   
   if (tokens.length === 0) return;
@@ -299,13 +296,19 @@ function runPrompt() {
   gridCells = Array(Math.max(tokens.length, cols * 2)).fill(null);
 
   tokens.forEach((token, idx) => {
-    // Match root note (e.g., Db, F#, C)
     const match = token.match(/^([A-G][#b]?)(.*)$/i);
     if (!match) return;
 
-    let rootStr = match[1].charAt(0).toUpperCase() + (match[1].slice(1) || '');
+    const notePart = match.at(1);
+    const qualPart = match.at(2) || '';
+
+    let rootStr = notePart.charAt(0).toUpperCase() + (notePart.slice(1) || '');
     const flatMap = { 'Db': 'C#', 'Eb': 'D#', 'Gb': 'F#', 'Ab': 'G#', 'Bb': 'A#' };
     if (flatMap[rootStr]) rootStr = flatMap[rootStr];
 
     const rootIdx = noteNames.indexOf(rootStr);
     if (rootIdx === -1) return;
+
+    const quality = qualPart.toLowerCase();
+    let matchedVoicing = voicingLibrary.find(v => quality && v.name.toLowerCase().includes(quality));
+    if (!matchedVoicing) {
