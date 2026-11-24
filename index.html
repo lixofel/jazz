@@ -13,32 +13,23 @@
       --panel: #1e293b;
       --border: #334155;
       --accent: #38bdf8;
-      --accent-hover: #0284c7;
       --text: #f8fafc;
       --muted: #94a3b8;
       --active-key: #f59e0b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
     body { background: var(--bg); color: var(--text); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-    
-    /* Top Header & Controls */
     header { background: var(--panel); padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
     .btn-group { display: flex; gap: 4px; background: var(--bg); padding: 3px; border-radius: 8px; }
     button, select, input { background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
     button { cursor: pointer; font-weight: 600; }
     button.active { background: var(--accent); color: #0f172a; border-color: var(--accent); }
     button.play-btn { background: #10b981; color: #0f172a; border: none; }
-    
-    /* Prompt Bar */
     .prompt-bar { display: flex; gap: 6px; padding: 8px 12px; background: #162032; border-bottom: 1px solid var(--border); }
     .prompt-bar input { flex: 1; background: var(--bg); }
-    
-    /* Main Workspace */
     main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
     .pane { flex: 1; overflow-y: auto; padding: 10px; }
     .hidden { display: none !important; }
-    
-    /* Spreadsheet Grid */
     .grid-controls { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
     .spreadsheet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
     .cell { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px 6px; text-align: center; min-height: 58px; display: flex; flex-direction: column; justify-content: center; cursor: pointer; }
@@ -46,15 +37,10 @@
     .cell.playing { border: 2px solid #10b981; background: #064e3b; }
     .cell-chord { font-weight: 700; font-size: 14px; color: var(--accent); }
     .cell-notes { font-size: 10px; color: var(--muted); margin-top: 3px; }
-
-    /* Voicing Library & Creator */
     .library-bar { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
     .voicing-chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; }
     .chip { background: #273549; border: 1px solid var(--border); padding: 6px 10px; border-radius: 16px; white-space: nowrap; font-size: 12px; cursor: pointer; }
-    .chip:hover { border-color: var(--accent); }
-
-    /* Virtual Keyboard */
-    #keyboard-pane { background: #090d16; border-top: 2px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; padding: 8px; }
+    #keyboard-pane { background: #090d16; border-top: 2px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; padding: 8px; flex: 0 0 auto; }
     .kb-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
     .piano { position: relative; display: flex; height: 140px; width: 100%; overflow-x: auto; user-select: none; }
     .white-key { flex: 1; min-width: 34px; background: #f8fafc; border: 1px solid #94a3b8; border-radius: 0 0 5px 5px; position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; color: #334155; font-size: 10px; font-weight: bold; }
@@ -85,17 +71,16 @@
   </div>
 
   <main>
-    <!-- Spreadsheet & Library Pane -->
     <div id="sheet-pane" class="pane">
       <div class="grid-controls">
         <label>Key:</label>
-        <select id="root-key" onchange="updateKey()">
+        <select id="root-key">
           <option value="0">C</option><option value="1">C# / Db</option><option value="2">D</option>
           <option value="3">D# / Eb</option><option value="4">E</option><option value="5">F</option>
           <option value="6">F# / Gb</option><option value="7">G</option><option value="8">G# / Ab</option>
           <option value="9">A</option><option value="10">A# / Bb</option><option value="11">B</option>
         </select>
-        <select id="time-sig" onchange="rebuildGrid()">
+        <select id="time-sig" onchange="clearGrid()">
           <option value="4">4/4 Time</option>
           <option value="3">3/4 Time</option>
           <option value="6">6/8 Time</option>
@@ -113,8 +98,7 @@
       <div id="voicing-chips" class="voicing-chips"></div>
     </div>
 
-    <!-- Virtual Keyboard Pane -->
-    <div id="keyboard-pane" class="pane" style="flex: 0 0 auto;">
+    <div id="keyboard-pane" class="pane">
       <div class="kb-toolbar">
         <span id="active-notes-display">Tap keys to build a voicing or select a cell</span>
         <button onclick="clearActiveKeys()">Clear Keys</button>
@@ -123,11 +107,115 @@
     </div>
   </main>
 
-  <script src="app.js"></script>
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js');
+    let synth = null;
+    const noteNames = "C,C#,D,D#,E,F,F#,G,G#,A,A#,B".split(",");
+
+    function initAudio(toneType) {
+      if (synth) synth.dispose();
+      const presets = {
+        rhodes: { oscillator: { type: "sine" }, envelope: { attack: 0.02, decay: 0.8, sustain: 0.3, release: 1.5 } },
+        grand: { oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 1.2, sustain: 0.2, release: 1.8 } },
+        pad: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.4, decay: 0.5, sustain: 0.8, release: 2.0 } },
+        organ: { oscillator: { type: "square" }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.9, release: 0.3 } }
+      };
+      synth = new Tone.PolySynth(Tone.Synth, presets[toneType || "rhodes"]).toDestination();
+      synth.volume.value = -6;
     }
-  </script>
-</body>
-</html>
+
+    async function changeTone(toneType) {
+      await Tone.start();
+      initAudio(toneType);
+    }
+
+    async function playMidiNotes(midiArray, duration) {
+      if (!synth) initAudio("rhodes");
+      await Tone.start();
+      const freqs = midiArray.map(function(m) { return Tone.Frequency(m, "midi").toNote(); });
+      synth.triggerAttackRelease(freqs, duration || "2n");
+    }
+
+    const defaultVoicings = [
+      { name: "Maj9 (Rootless)", intervals: "4,7,11,14".split(",").map(Number) },
+      { name: "Maj13 (#11)", intervals: "4,11,14,18,21".split(",").map(Number) },
+      { name: "m9 (So What)", intervals: "3,8,13,18,22".split(",").map(Number) },
+      { name: "m11 (Neo-Soul)", intervals: "3,7,10,14,17".split(",").map(Number) },
+      { name: "13 (Bill Evans)", intervals: "4,10,14,21".split(",").map(Number) },
+      { name: "7alt (#9 #5)", intervals: "4,8,10,15".split(",").map(Number) },
+      { name: "7b9 (Dim)", intervals: "4,7,10,13,21".split(",").map(Number) },
+      { name: "m7b5 (Half-Dim)", intervals: "3,6,10,14".split(",").map(Number) },
+      { name: "6/9", intervals: "4,9,14,19".split(",").map(Number) },
+      { name: "Sus13", intervals: "5,10,14,21".split(",").map(Number) }
+    ];
+
+    let voicingLibrary = JSON.parse(localStorage.getItem("jazzVoicings")) || defaultVoicings;
+    function saveLibrary() { localStorage.setItem("jazzVoicings", JSON.stringify(voicingLibrary)); }
+
+    let activeKeys = new Set();
+    let selectedCellIndex = 0;
+    let gridCells = Array(16).fill(null);
+    let isPlaying = false;
+    let playInterval = null;
+
+    function midiToName(midi) {
+      return noteNames[midi % 12] + (Math.floor(midi / 12) - 1);
+    }
+
+    function renderSpreadsheet() {
+      const container = document.getElementById("spreadsheet");
+      const cols = parseInt(document.getElementById("time-sig").value);
+      container.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
+      container.innerHTML = "";
+
+      gridCells.forEach(function(cell, idx) {
+        const div = document.createElement("div");
+        div.className = "cell" + (idx === selectedCellIndex ? " selected" : "");
+        div.id = "cell-" + idx;
+        div.onclick = function() { selectCell(idx); };
+
+        if (cell) {
+          const noteLabels = cell.midi.map(function(m) { return noteNames[m % 12]; }).join("-");
+          div.innerHTML = "<div class='cell-chord'>" + cell.label + "</div><div class='cell-notes'>" + noteLabels + "</div>";
+        } else {
+          div.innerHTML = "<div class='cell-notes'>Beat " + ((idx % cols) + 1) + "</div>";
+        }
+        container.appendChild(div);
+      });
+    }
+
+    function selectCell(idx) {
+      selectedCellIndex = idx;
+      renderSpreadsheet();
+      const cell = gridCells[idx];
+let matchedVoicing = voicingLibrary.find(function(v) { return quality && v.name.toLowerCase().includes(quality); });
+if (!matchedVoicing) {
+if (quality.includes("m")) matchedVoicing = voicingLibrary.find(function(v) { return v.name.toLowerCase().startsWith("m"); });
+else if (quality.includes("13") || quality.includes("7") || quality.includes("alt")) matchedVoicing = voicingLibrary.find(function(v) { return v.name.includes("13") || v.name.includes("7"); });
+else matchedVoicing = voicingLibrary.at(0);
+}
+const baseMidi = 48 + rootIdx;
+gridCells[idx] = {
+label: token + " (" + matchedVoicing.name + ")",
+midi: matchedVoicing.intervals.map(function(i) { return baseMidi + i; })
+};
+});
+selectedCellIndex = 0;
+renderSpreadsheet();
+selectCell(0);
+}
+buildKeyboard();
+renderSpreadsheet();
+renderLibrary();
+
+
+
+---
+
+### Step 2: Load It Without Old Cache on Your S22 Ultra
+1. Wait 15 seconds for Vercel to finish deploying the updated `index.html`.
+2. Open your `.vercel.app` link in **Chrome** or **Samsung Internet**.
+3. **Important:** Tap the **lock icon (`🔒`)** in the browser address bar > **Cookies and site data** (or **Site settings**) > **Delete / Clear data**, then reload the page. *(This wipes out the stuck Service Worker cache so your phone immediately draws the grid and piano keys).*
+
+<FollowUp>
+Update `index.html` with this self-contained version, clear site data once, and let me know if your **spreadsheet grid, chord chips, and piano keys** appear!
+</FollowUp>
