@@ -152,347 +152,94 @@
         <div class="key black-key" data-midi="70" onclick="togglePianoKey(70)"></div>
         <div class="key white-key" data-midi="71" onclick="togglePianoKey(71)">B4</div>
       </div>
-    </div>
-  </main>
+        <script>
+    var ac = null;
+    var toneType = "sine";
+    var sel = 0;
+    var gridData = {};
+    var notes = "C,C#,D,D#,E,F,F#,G,G#,A,A#,B".split(",");
+    var chords = "4-7-11-14,4-11-14-18-21,3-8-13-18-22,3-7-10-14-17,4-10-14-21,4-8-10-15,4-7-10-13-21,3-6-10-14,4-9-14-19,5-10-14-21".split(",");
+    var chordNames = "Maj9,Maj13,m9,m11,13,7alt,7b9,m7b5,6/9,Sus13".split(",");
 
-  <script>
-    var audioCtx = null;
-    var currentTone = "rhodes";
-    var noteNames = "C,C#,D,D#,E,F,F#,G,G#,A,A#,B".split(",");
-
-    function ensureAudio() {
-      if (!audioCtx) {
-        var AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioContext();
-      }
-      if (audioCtx.state === "suspended") {
-        audioCtx.resume();
-      }
+    function playNote(m) {
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!ac) ac = new AudioCtx();
+      if (ac.state === "suspended") ac.resume();
+      var osc = ac.createOscillator();
+      var g = ac.createGain();
+      osc.type = toneType;
+      osc.frequency.value = 440 * Math.pow(2, (m - 69) / 12);
+      g.gain.setValueAtTime(0.25, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 1.0);
+      osc.connect(g);
+      g.connect(ac.destination);
+      osc.start();
+      osc.stop(ac.currentTime + 1.0);
     }
 
-    function changeTone(toneType) {
-      currentTone = toneType;
-      ensureAudio();
-      var testChord = [];
-      testChord.push(60);
-      testChord.push(64);
-      testChord.push(67);
-      playMidiNotes(testChord, 0.4);
+    function changeTone(val) {
+      if (val === "grand") toneType = "triangle";
+      else if (val === "pad") toneType = "sawtooth";
+      else if (val === "organ") toneType = "square";
+      else toneType = "sine";
+      playNote(60);
     }
 
-    function playMidiNotes(midiArray, duration) {
-      ensureAudio();
-      var dur = (typeof duration === "number") ? duration : (duration === "8n" ? 0.5 : 1.4);
-      var now = audioCtx.currentTime;
-
-      midiArray.forEach(function(midi) {
-        var freq = 440 * Math.pow(2, (midi - 69) / 12);
-        var osc = audioCtx.createOscillator();
-        var osc2 = audioCtx.createOscillator();
-        var gain = audioCtx.createGain();
-
-        if (currentTone === "rhodes") {
-          osc.type = "sine";
-          osc2.type = "triangle";
-          osc2.frequency.value = freq * 2;
-        } else if (currentTone === "grand") {
-          osc.type = "triangle";
-          osc2.type = "sine";
-          osc2.frequency.value = freq;
-        } else if (currentTone === "pad") {
-          osc.type = "sawtooth";
-          osc2.type = "sine";
-          osc2.frequency.value = freq * 1.003;
-        } else {
-          osc.type = "square";
-          osc2.type = "sine";
-          osc2.frequency.value = freq * 2;
+    function togglePianoKey(m) {
+      var all = document.querySelectorAll(".key");
+      for (var i = 0; i < all.length; i++) {
+        if (parseInt(all[i].getAttribute("data-midi")) === m) {
+          if (all[i].classList.contains("active")) {
+            all[i].classList.remove("active");
+          } else {
+            all[i].classList.add("active");
+            playNote(m);
+          }
         }
-
-        osc.frequency.value = freq;
-
-        var attack = (currentTone === "pad") ? 0.25 : 0.015;
-        gain.gain.setValueAtTime(0.001, now);
-        gain.gain.linearRampToValueAtTime(0.18, now + attack);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-
-        osc.connect(gain);
-        osc2.connect(gain);
-        gain.connect(audioCtx.destination);
-
-        osc.start(now);
-        osc2.start(now);
-        osc.stop(now + dur + 0.05);
-        osc2.stop(now + dur + 0.05);
-      });
-    }
-
-    var voicingLibrary = [
-      { name: "Maj9 (Rootless)", intervals: "4,7,11,14".split(",").map(Number) },
-      { name: "Maj13 (#11)", intervals: "4,11,14,18,21".split(",").map(Number) },
-      { name: "m9 (So What)", intervals: "3,8,13,18,22".split(",").map(Number) },
-      { name: "m11 (Neo-Soul)", intervals: "3,7,10,14,17".split(",").map(Number) },
-      { name: "13 (Bill Evans)", intervals: "4,10,14,21".split(",").map(Number) },
-      { name: "7alt (#9 #5)", intervals: "4,8,10,15".split(",").map(Number) },
-      { name: "7b9 (Dim)", intervals: "4,7,10,13,21".split(",").map(Number) },
-      { name: "m7b5 (Half-Dim)", intervals: "3,6,10,14".split(",").map(Number) },
-      { name: "6/9", intervals: "4,9,14,19".split(",").map(Number) },
-      { name: "Sus13", intervals: "5,10,14,21".split(",").map(Number) }
-    ];
-
-    try {
-      var saved = localStorage.getItem("jazzVoicings");
-      if (saved) voicingLibrary = JSON.parse(saved);
-    } catch (e) {}
-
-    function saveLibrary() {
-      try { localStorage.setItem("jazzVoicings", JSON.stringify(voicingLibrary)); } catch (e) {}
-    }
-
-    var activeKeys = new Set();
-    var selectedCellIndex = 0;
-    var gridCells = [];
-    for (var i = 0; i < 16; i++) gridCells.push(null);
-    var isPlaying = false;
-    var playInterval = null;
-
-    function midiToName(midi) {
-      return noteNames.slice(midi % 12, (midi % 12) + 1).pop() + (Math.floor(midi / 12) - 1);
-    }
-
-    function updateCellDOM(idx) {
-      var div = document.getElementById("cell-" + idx);
-      if (!div) return;
-      var cols = parseInt(document.getElementById("time-sig").value) || 4;
-      div.className = "cell" + (idx === selectedCellIndex ? " selected" : "");
-      var cell = gridCells.slice(idx, idx + 1).pop();
-      if (cell) {
-        var noteLabels = cell.midi.map(function(m) { return noteNames.slice(m % 12, (m % 12) + 1).pop(); }).join("-");
-        div.textContent = cell.label + " (" + noteLabels + ")";
-      } else {
-        div.textContent = "Beat " + ((idx % cols) + 1);
       }
-    }
-
-    function refreshAllCells() {
-      var container = document.getElementById("spreadsheet");
-      var cols = parseInt(document.getElementById("time-sig").value) || 4;
-      container.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
-      for (var i = 0; i < gridCells.length; i++) updateCellDOM(i);
-    }
-
-    function selectCell(idx) {
-      selectedCellIndex = idx;
-      refreshAllCells();
-      var cell = gridCells.slice(idx, idx + 1).pop();
-      if (cell && cell.midi.length > 0) {
-        activeKeys = new Set(cell.midi);
-        syncKeyboardUI();
-        playMidiNotes(cell.midi);
-      }
-    }
-
-    function applyPreset(presetIdx) {
-      var voicing = voicingLibrary.slice(presetIdx, presetIdx + 1).pop();
-      if (voicing) applyVoicingToSelectedCell(voicing);
-    }
-
-    function applyVoicingToSelectedCell(voicing) {
-      var rootOffset = parseInt(document.getElementById("root-key").value) || 0;
-      var rootName = noteNames.slice(rootOffset, rootOffset + 1).pop();
-      var baseMidi = 48 + rootOffset;
-      var transposedMidi = voicing.intervals.map(function(interval) { return baseMidi + interval; });
-
-      gridCells.splice(selectedCellIndex, 1, { label: rootName + " " + voicing.name, midi: transposedMidi });
-      activeKeys = new Set(transposedMidi);
-      syncKeyboardUI();
-      refreshAllCells();
-      playMidiNotes(transposedMidi);
-
-      if (selectedCellIndex < gridCells.length - 1) {
-        selectedCellIndex++;
-        refreshAllCells();
-      }
-    }
-
-    function addRow() {
-      var container = document.getElementById("spreadsheet");
-      var cols = parseInt(document.getElementById("time-sig").value) || 4;
-      for (var i = 0; i < cols; i++) {
-        var newIdx = gridCells.length;
-        gridCells.push(null);
-        var div = document.createElement("div");
-        div.className = "cell";
-        div.id = "cell-" + newIdx;
-        div.textContent = "Beat " + ((newIdx % cols) + 1);
-        (function(index) { div.onclick = function() { selectCell(index); }; })(newIdx);
-        container.appendChild(div);
-      }
-    }
-
-    function clearGrid() {
-      for (var i = 0; i < gridCells.length; i++) gridCells.splice(i, 1, null);
-      selectedCellIndex = 0;
-      refreshAllCells();
-    }
-
-    function togglePianoKey(midi) {
-      if (activeKeys.has(midi)) {
-        activeKeys.delete(midi);
-      } else {
-        activeKeys.add(midi);
-        var single = [];
-        single.push(midi);
-        playMidiNotes(single, "8n");
-      }
-      syncKeyboardUI();
-    }
-
-    function syncKeyboardUI() {
-      var keys = document.querySelectorAll(".key");
-      keys.forEach(function(k) {
-        var m = parseInt(k.getAttribute("data-midi"));
-        if (activeKeys.has(m)) k.classList.add("active");
-        else k.classList.remove("active");
-      });
-      var sorted = Array.from(activeKeys).sort(function(a, b) { return a - b; });
-      document.getElementById("active-notes-display").textContent =
-        sorted.length ? "Selected: " + sorted.map(midiToName).join(" ") : "Ready - Tap keys or select a cell";
     }
 
     function clearActiveKeys() {
-      activeKeys.clear();
-      syncKeyboardUI();
+      var all = document.querySelectorAll(".key");
+      for (var i = 0; i < all.length; i++) all[i].classList.remove("active");
     }
 
-    function saveCurrentKeysAsTemplate() {
-      var sorted = Array.from(activeKeys).sort(function(a, b) { return a - b; });
-      if (sorted.length < 2) {
-        alert("Tap at least 2 notes on the keyboard first to save a voicing template.");
-        return;
+    function selectCell(idx) {
+      sel = idx;
+      var cells = document.querySelectorAll(".cell");
+      for (var i = 0; i < cells.length; i++) {
+        if (i === idx) cells[i].classList.add("selected");
+        else cells[i].classList.remove("selected");
       }
-      var name = prompt("Name this voicing template (e.g., My Dark m11, Gospel Drop-2):");
-      if (!name) return;
-
-      var rootOffset = parseInt(document.getElementById("root-key").value) || 0;
-      var lowestNote = sorted.slice(0, 1).pop();
-      var rootMidi = lowestNote - ((lowestNote - rootOffset) % 12);
-      var intervals = sorted.map(function(m) { return m - rootMidi; });
-
-      voicingLibrary.unshift({ name: name, intervals: intervals });
-      saveLibrary();
-      renderLibrary();
+      if (gridData[idx]) {
+        clearActiveKeys();
+        var list = gridData[idx].split(",");
+        for (var j = 0; j < list.length; j++) togglePianoKey(parseInt(list[j]));
+      }
     }
 
-    function renderLibrary() {
-      var query = document.getElementById("search-voicing").value.toLowerCase();
-      var container = document.getElementById("voicing-chips");
-      container.innerHTML = "";
-
-      voicingLibrary.forEach(function(voicing) {
-        if (voicing.name.toLowerCase().indexOf(query) !== -1) {
-          var chip = document.createElement("div");
-          chip.className = "chip";
-          chip.textContent = voicing.name;
-          chip.onclick = function() { applyVoicingToSelectedCell(voicing); };
-          container.appendChild(chip);
-        }
-      });
+    function applyPreset(pIdx) {
+      var root = parseInt(document.getElementById("root-key").value) || 0;
+      var intervals = chords[pIdx].split("-");
+      var midis = [];
+      clearActiveKeys();
+      for (var i = 0; i < intervals.length; i++) {
+        var m = 48 + root + parseInt(intervals[i]);
+        midis.push(m);
+        togglePianoKey(m);
+      }
+      gridData[sel] = midis.join(",");
+      var box = document.getElementById("cell-" + sel);
+      if (box) box.textContent = notes[root] + " " + chordNames[pIdx];
+      if (sel < 15) selectCell(sel + 1);
     }
 
     function setView(mode) {
-      var sheet = document.getElementById("sheet-pane");
-      var keys = document.getElementById("keyboard-pane");
-      document.querySelectorAll("header .btn-group button").forEach(function(b) { b.classList.remove("active"); });
-      document.getElementById("view-" + mode).classList.add("active");
-
-      if (mode === "split") { sheet.classList.remove("hidden"); keys.classList.remove("hidden"); }
-      else if (mode === "sheet") { sheet.classList.remove("hidden"); keys.classList.add("hidden"); }
-      else if (mode === "keys") { sheet.classList.add("hidden"); keys.classList.remove("hidden"); }
+      var s = document.getElementById("sheet-pane");
+      var k = document.getElementById("keyboard-pane");
+      s.style.display = (mode === "keys") ? "none" : "block";
+      k.style.display = (mode === "sheet") ? "none" : "flex";
     }
-
-    function togglePlay() {
-      var btn = document.getElementById("play-btn");
-      if (isPlaying) {
-        isPlaying = false;
-        clearInterval(playInterval);
-        btn.textContent = "▶ Play";
-        document.querySelectorAll(".cell").forEach(function(c) { c.classList.remove("playing"); });
-        return;
-      }
-
-      isPlaying = true;
-      btn.textContent = "⏹ Stop";
-      var step = 0;
-
-      var tick = function() {
-        document.querySelectorAll(".cell").forEach(function(c) { c.classList.remove("playing"); });
-var currentEl = document.getElementById("cell-" + step);
-if (currentEl) currentEl.classList.add("playing");
-var cell = gridCells.slice(step, step + 1).pop();
-if (cell && cell.midi.length > 0) {
-playMidiNotes(cell.midi, "2n");
-activeKeys = new Set(cell.midi);
-syncKeyboardUI();
-}
-step = (step + 1) % gridCells.length;
-};
-tick();
-playInterval = setInterval(tick, 900);
-}
-function runPrompt() {
-var raw = document.getElementById("prompt-input").value.trim();
-if (!raw) return;
-if (raw.indexOf("3/4") !== -1) document.getElementById("time-sig").value = "3";
-else if (raw.indexOf("6/8") !== -1) document.getElementById("time-sig").value = "6";
-else if (raw.indexOf("4/4") !== -1) document.getElementById("time-sig").value = "4";
-var cleaned = raw.replace("3/4", "").replace("4/4", "").replace("6/8", "");
-var rawParts = cleaned.split("|");
-var tokens = [];
-rawParts.forEach(function(part) {
-var t = part.trim();
-if (t) tokens.push(t);
-});
-if (tokens.length === 0) return;
-clearGrid();
-var flatMap = { "Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#" };
-tokens.forEach(function(token, idx) {
-if (idx >= gridCells.length) addRow();
-var firstChar = token.charAt(0).toUpperCase();
-if ("ABCDEFG".indexOf(firstChar) === -1) return;
-var secondChar = token.charAt(1);
-var rootStr = firstChar;
-var qualPart = token.substring(1);
-if (secondChar === "#" || secondChar === "b") {
-rootStr = firstChar + secondChar;
-qualPart = token.substring(2);
-}
-if (flatMap[rootStr]) rootStr = flatMap[rootStr];
-var rootIdx = noteNames.indexOf(rootStr);
-if (rootIdx === -1) return;
-var quality = qualPart.toLowerCase();
-var matchedVoicing = null;
-voicingLibrary.forEach(function(v) {
-if (!matchedVoicing && quality && v.name.toLowerCase().indexOf(quality) !== -1) {
-matchedVoicing = v;
-}
-});
-if (!matchedVoicing) {
-voicingLibrary.forEach(function(v) {
-var vName = v.name.toLowerCase();
-if (!matchedVoicing && quality.indexOf("m") !== -1 && vName.charAt(0) === "m") matchedVoicing = v;
-if (!matchedVoicing && (quality.indexOf("13") !== -1 || quality.indexOf("7") !== -1 || quality.indexOf("alt") !== -1) && (vName.indexOf("13") !== -1 || vName.indexOf("7") !== -1)) matchedVoicing = v;
-});
-}
-if (!matchedVoicing) matchedVoicing = voicingLibrary.slice(0, 1).pop();
-var baseMidi = 48 + rootIdx;
-gridCells.splice(idx, 1, {
-label: token + " (" + matchedVoicing.name + ")",
-midi: matchedVoicing.intervals.map(function(interval) { return baseMidi + interval; })
-});
-});
-selectedCellIndex = 0;
-refreshAllCells();
-selectCell(0);
-}
-renderLibrary();
+  </script>
+</body>
+</html>
