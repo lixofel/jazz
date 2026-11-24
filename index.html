@@ -8,44 +8,35 @@
   <meta name="theme-color" content="#0f172a" />
   <script src="https://cloudflare.com"></script>
   <style>
-    :root {
-      --bg: #0f172a;
-      --panel: #1e293b;
-      --border: #334155;
-      --accent: #38bdf8;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --active-key: #f59e0b;
-    }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-    body { background: var(--bg); color: var(--text); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-    header { background: var(--panel); padding: 8px 12px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
-    .btn-group { display: flex; gap: 4px; background: var(--bg); padding: 3px; border-radius: 8px; }
-    button, select, input { background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+    body { background: #0f172a; color: #f8fafc; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+    header { background: #1e293b; padding: 8px 12px; border-bottom: 1px solid #334155; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+    .btn-group { display: flex; gap: 4px; background: #0f172a; padding: 3px; border-radius: 8px; }
+    button, select, input { background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 6px 10px; border-radius: 6px; font-size: 13px; }
     button { cursor: pointer; font-weight: 600; }
-    button.active { background: var(--accent); color: #0f172a; border-color: var(--accent); }
+    button.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
     button.play-btn { background: #10b981; color: #0f172a; border: none; }
-    .prompt-bar { display: flex; gap: 6px; padding: 8px 12px; background: #162032; border-bottom: 1px solid var(--border); }
-    .prompt-bar input { flex: 1; background: var(--bg); }
+    .prompt-bar { display: flex; gap: 6px; padding: 8px 12px; background: #162032; border-bottom: 1px solid #334155; }
+    .prompt-bar input { flex: 1; background: #0f172a; }
     main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
     .pane { flex: 1; overflow-y: auto; padding: 10px; }
     .hidden { display: none !important; }
     .grid-controls { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
-    .spreadsheet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-    .cell { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 10px 6px; text-align: center; min-height: 58px; display: flex; flex-direction: column; justify-content: center; cursor: pointer; }
-    .cell.selected { border: 2px solid var(--accent); background: #1e3a5f; }
+    .spreadsheet { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; min-height: 120px; }
+    .cell { background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 10px 6px; text-align: center; min-height: 56px; display: flex; flex-direction: column; justify-content: center; cursor: pointer; }
+    .cell.selected { border: 2px solid #38bdf8; background: #1e3a5f; }
     .cell.playing { border: 2px solid #10b981; background: #064e3b; }
-    .cell-chord { font-weight: 700; font-size: 14px; color: var(--accent); }
-    .cell-notes { font-size: 10px; color: var(--muted); margin-top: 3px; }
+    .cell-chord { font-weight: 700; font-size: 13px; color: #38bdf8; }
+    .cell-notes { font-size: 11px; color: #94a3b8; margin-top: 3px; }
     .library-bar { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
-    .voicing-chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; }
-    .chip { background: #273549; border: 1px solid var(--border); padding: 6px 10px; border-radius: 16px; white-space: nowrap; font-size: 12px; cursor: pointer; }
-    #keyboard-pane { background: #090d16; border-top: 2px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; padding: 8px; flex: 0 0 auto; }
+    .voicing-chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; min-height: 44px; }
+    .chip { background: #273549; border: 1px solid #38bdf8; color: #f8fafc; padding: 6px 12px; border-radius: 16px; white-space: nowrap; font-size: 12px; cursor: pointer; }
+    #keyboard-pane { background: #090d16; border-top: 2px solid #334155; display: flex; flex-direction: column; justify-content: space-between; padding: 8px; flex: 0 0 auto; }
     .kb-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
-    .piano { position: relative; display: flex; height: 140px; width: 100%; overflow-x: auto; user-select: none; }
-    .white-key { flex: 1; min-width: 34px; background: #f8fafc; border: 1px solid #94a3b8; border-radius: 0 0 5px 5px; position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; color: #334155; font-size: 10px; font-weight: bold; }
-    .black-key { width: 22px; height: 85px; background: #0f172a; border: 1px solid #475569; border-radius: 0 0 4px 4px; margin-left: -11px; margin-right: -11px; z-index: 2; }
-    .key.active { background: var(--active-key) !important; color: #000; }
+    .piano { position: relative; display: flex; height: 145px; width: 100%; overflow-x: auto; user-select: none; background: #0f172a; }
+    .white-key { flex: 1; min-width: 36px; height: 140px; background: #f8fafc; border: 1px solid #64748b; border-radius: 0 0 5px 5px; position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; color: #0f172a; font-size: 10px; font-weight: bold; }
+    .black-key { width: 24px; height: 85px; background: #0f172a; border: 1px solid #475569; border-radius: 0 0 4px 4px; margin-left: -12px; margin-right: -12px; z-index: 2; }
+    .key.active { background: #f59e0b !important; color: #000000 !important; }
   </style>
 </head>
 <body>
@@ -108,12 +99,13 @@
   </main>
 
   <script>
-    let synth = null;
-    const noteNames = "C,C#,D,D#,E,F,F#,G,G#,A,A#,B".split(",");
+    var synth = null;
+    var noteNames = "C,C#,D,D#,E,F,F#,G,G#,A,A#,B".split(",");
 
     function initAudio(toneType) {
+      if (typeof Tone === "undefined") return;
       if (synth) synth.dispose();
-      const presets = {
+      var presets = {
         rhodes: { oscillator: { type: "sine" }, envelope: { attack: 0.02, decay: 0.8, sustain: 0.3, release: 1.5 } },
         grand: { oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 1.2, sustain: 0.2, release: 1.8 } },
         pad: { oscillator: { type: "sawtooth" }, envelope: { attack: 0.4, decay: 0.5, sustain: 0.8, release: 2.0 } },
@@ -123,19 +115,22 @@
       synth.volume.value = -6;
     }
 
-    async function changeTone(toneType) {
-      await Tone.start();
-      initAudio(toneType);
+    function changeTone(toneType) {
+      if (typeof Tone !== "undefined") {
+        Tone.start().then(function() { initAudio(toneType); });
+      }
     }
 
-    async function playMidiNotes(midiArray, duration) {
+    function playMidiNotes(midiArray, duration) {
+      if (typeof Tone === "undefined") return;
       if (!synth) initAudio("rhodes");
-      await Tone.start();
-      const freqs = midiArray.map(function(m) { return Tone.Frequency(m, "midi").toNote(); });
-      synth.triggerAttackRelease(freqs, duration || "2n");
+      Tone.start().then(function() {
+        var freqs = midiArray.map(function(m) { return Tone.Frequency(m, "midi").toNote(); });
+        synth.triggerAttackRelease(freqs, duration || "2n");
+      });
     }
 
-    const defaultVoicings = [
+    var defaultVoicings = [
       { name: "Maj9 (Rootless)", intervals: "4,7,11,14".split(",").map(Number) },
       { name: "Maj13 (#11)", intervals: "4,11,14,18,21".split(",").map(Number) },
       { name: "m9 (So What)", intervals: "3,8,13,18,22".split(",").map(Number) },
@@ -148,74 +143,93 @@
       { name: "Sus13", intervals: "5,10,14,21".split(",").map(Number) }
     ];
 
-    let voicingLibrary = JSON.parse(localStorage.getItem("jazzVoicings")) || defaultVoicings;
-    function saveLibrary() { localStorage.setItem("jazzVoicings", JSON.stringify(voicingLibrary)); }
+    var voicingLibrary = defaultVoicings;
+    try {
+      var saved = localStorage.getItem("jazzVoicings");
+      if (saved) voicingLibrary = JSON.parse(saved);
+    } catch (e) {}
 
-    let activeKeys = new Set();
-    let selectedCellIndex = 0;
-    let gridCells = Array(16).fill(null);
-    let isPlaying = false;
-    let playInterval = null;
+    function saveLibrary() {
+      try { localStorage.setItem("jazzVoicings", JSON.stringify(voicingLibrary)); } catch (e) {}
+    }
+
+    var activeKeys = new Set();
+    var selectedCellIndex = 0;
+    var gridCells = [];
+    for (var i = 0; i < 16; i++) gridCells.push(null);
+    var isPlaying = false;
+    var playInterval = null;
 
     function midiToName(midi) {
       return noteNames[midi % 12] + (Math.floor(midi / 12) - 1);
     }
 
     function renderSpreadsheet() {
-      const container = document.getElementById("spreadsheet");
-      const cols = parseInt(document.getElementById("time-sig").value);
+      var container = document.getElementById("spreadsheet");
+      var cols = parseInt(document.getElementById("time-sig").value) || 4;
       container.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
       container.innerHTML = "";
 
-      gridCells.forEach(function(cell, idx) {
-        const div = document.createElement("div");
-        div.className = "cell" + (idx === selectedCellIndex ? " selected" : "");
-        div.id = "cell-" + idx;
-        div.onclick = function() { selectCell(idx); };
+      for (var idx = 0; idx < gridCells.length; idx++) {
+        (function(index) {
+          var cell = gridCells[index];
+          var div = document.createElement("div");
+          div.className = "cell" + (index === selectedCellIndex ? " selected" : "");
+          div.id = "cell-" + index;
+          div.onclick = function() { selectCell(index); };
 
-        if (cell) {
-          const noteLabels = cell.midi.map(function(m) { return noteNames[m % 12]; }).join("-");
-          div.innerHTML = "<div class='cell-chord'>" + cell.label + "</div><div class='cell-notes'>" + noteLabels + "</div>";
-        } else {
-          div.innerHTML = "<div class='cell-notes'>Beat " + ((idx % cols) + 1) + "</div>";
-        }
-        container.appendChild(div);
-      });
-    }
-
-    function selectCell(idx) {
-      selectedCellIndex = idx;
-      renderSpreadsheet();
-      const cell = gridCells[idx];
-let matchedVoicing = voicingLibrary.find(function(v) { return quality && v.name.toLowerCase().includes(quality); });
-if (!matchedVoicing) {
-if (quality.includes("m")) matchedVoicing = voicingLibrary.find(function(v) { return v.name.toLowerCase().startsWith("m"); });
-else if (quality.includes("13") || quality.includes("7") || quality.includes("alt")) matchedVoicing = voicingLibrary.find(function(v) { return v.name.includes("13") || v.name.includes("7"); });
-else matchedVoicing = voicingLibrary.at(0);
+          if (cell) {
+            var noteLabels = cell.midi.map(function(m) { return noteNames[m % 12]; }).join("-");
+            div.innerHTML = "<div class='cell-chord'>" + cell.label + "</div><div class='cell-notes'>" + noteLabels + "</div>";
+          } else {
+            div.innerHTML = "<div class='cell-notes'>Beat " + ((index % cols) + 1) + "</div>";
+          }
+var totalCells = Math.max(tokens.length, cols * 2);
+gridCells = [];
+for (var j = 0; j < totalCells; j++) gridCells.push(null);
+var flatMap = { "Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#" };
+for (var idx = 0; idx < tokens.length; idx++) {
+var token = tokens[idx];
+var firstChar = token.charAt(0).toUpperCase();
+if ("ABCDEFG".indexOf(firstChar) === -1) continue;
+var secondChar = token.charAt(1);
+var rootStr = firstChar;
+var qualPart = token.substring(1);
+if (secondChar === "#" || secondChar === "b") {
+rootStr = firstChar + secondChar;
+qualPart = token.substring(2);
 }
-const baseMidi = 48 + rootIdx;
+if (flatMap[rootStr]) rootStr = flatMap[rootStr];
+var rootIdx = noteNames.indexOf(rootStr);
+if (rootIdx === -1) continue;
+var quality = qualPart.toLowerCase();
+var matchedVoicing = null;
+for (var v = 0; v < voicingLibrary.length; v++) {
+if (quality && voicingLibrary[v].name.toLowerCase().indexOf(quality) !== -1) {
+matchedVoicing = voicingLibrary[v];
+break;
+}
+}
+if (!matchedVoicing) {
+for (var v2 = 0; v2 < voicingLibrary.length; v2++) {
+var vName = voicingLibrary[v2].name.toLowerCase();
+if (quality.indexOf("m") !== -1 && vName.charAt(0) === "m") { matchedVoicing = voicingLibrary[v2]; break; }
+if ((quality.indexOf("13") !== -1 || quality.indexOf("7") !== -1 || quality.indexOf("alt") !== -1) && (vName.indexOf("13") !== -1 || vName.indexOf("7") !== -1)) { matchedVoicing = voicingLibrary[v2]; break; }
+}
+}
+if (!matchedVoicing) matchedVoicing = voicingLibrary.slice(0, 1).pop();
+var baseMidi = 48 + rootIdx;
 gridCells[idx] = {
 label: token + " (" + matchedVoicing.name + ")",
-midi: matchedVoicing.intervals.map(function(i) { return baseMidi + i; })
+midi: matchedVoicing.intervals.map(function(interval) { return baseMidi + interval; })
 };
-});
+}
 selectedCellIndex = 0;
 renderSpreadsheet();
 selectCell(0);
 }
+window.onload = function() {
 buildKeyboard();
 renderSpreadsheet();
 renderLibrary();
-
-
-
----
-
-### Step 2: Load It Without Old Cache on Your S22 Ultra
-1. Wait 15 seconds for Vercel to finish deploying the updated `index.html`.
-2. Open your `.vercel.app` link in **Chrome** or **Samsung Internet**.
-3. **Important:** Tap the **lock icon (`🔒`)** in the browser address bar > **Cookies and site data** (or **Site settings**) > **Delete / Clear data**, then reload the page. *(This wipes out the stuck Service Worker cache so your phone immediately draws the grid and piano keys).*
-
-<FollowUp>
-Update `index.html` with this self-contained version, clear site data once, and let me know if your **spreadsheet grid, chord chips, and piano keys** appear!
-</FollowUp>
+};
